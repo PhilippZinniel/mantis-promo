@@ -63,16 +63,37 @@ export class World {
     const OS = 1.8;
     const L = [['sky', 0.0], ['far', 0.55], ['mid', 1.2], ['near', 2.1], ['leaves', 3.4]];
     L.forEach(([name, z], i) => {
-      const lt = tex(A.art['vista_' + name], { aniso: this.aniso });
-      lt.wrapS = lt.wrapT = THREE.ClampToEdgeWrapping; lt.repeat.set(OS, OS); lt.offset.set((1 - OS) / 2, (1 - OS) / 2);
+      let lt;
+      if (name === 'near' || name === 'leaves') {
+        // foreground layers: pad with transparency so the oversize plane never smears their cut-off edge (matters in 9:16)
+        const src = A.art['vista_' + name], pc = document.createElement('canvas');
+        pc.width = Math.round(src.width * OS); pc.height = Math.round(src.height * OS);
+        const px = pc.getContext('2d');
+        px.drawImage(src, (pc.width - src.width) / 2, (pc.height - src.height) / 2);
+        if (this.H > this.W && name === 'leaves') {                       // 9:16 sees the layer's bottom edge: let the blades melt into the mist there
+          const y0 = (pc.height + src.height) / 2, g = px.createLinearGradient(0, y0 - src.height * 0.13, 0, y0);
+          g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+          px.globalCompositeOperation = 'destination-out'; px.fillStyle = g; px.fillRect(0, y0 - src.height * 0.13, pc.width, src.height * 0.13 + 4); px.globalCompositeOperation = 'source-over';
+        }
+        lt = tex(pc, { aniso: this.aniso });
+      } else {
+        lt = tex(A.art['vista_' + name], { aniso: this.aniso });
+        lt.wrapS = lt.wrapT = THREE.ClampToEdgeWrapping; lt.repeat.set(OS, OS); lt.offset.set((1 - OS) / 2, (1 - OS) / 2);
+      }
       const m = new THREE.Mesh(new THREE.PlaneGeometry(p1[2] * S * OS, p1[3] * S * OS), basic(lt, { transparent: i > 0, depthWrite: false }));
       m.renderOrder = 10 + i; m.userData.z = z; m.userData.base = new THREE.Vector3(wx(this.vistaCenter[0]), wy(this.vistaCenter[1]), 0);
       sc.add(m); this.layers.push(m);
     });
     // mist sheets for atmosphere / parallax
     this.mists = [];
+    // mist sheets: soften the left/right edges too (in 9:16 the sheets' ends can enter the frame)
+    const mc = document.createElement('canvas'); mc.width = A.art.vista_mist.width; mc.height = A.art.vista_mist.height;
+    const mx = mc.getContext('2d'); mx.drawImage(A.art.vista_mist, 0, 0); mx.globalCompositeOperation = 'destination-in';
+    const mg = mx.createLinearGradient(0, 0, mc.width, 0); mg.addColorStop(0, 'rgba(0,0,0,0)'); mg.addColorStop(0.22, 'rgba(0,0,0,1)'); mg.addColorStop(0.78, 'rgba(0,0,0,1)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
+    mx.fillStyle = mg; mx.fillRect(0, 0, mc.width, mc.height);
+    const mistTex = tex(mc, { aniso: 4 });
     [[0.9, 0.3, 1.6, 0.0], [1.7, 0.2, 1.3, 0.5], [2.8, 0.14, 1.1, 0.25]].forEach(([z, op, sc2, ph], i) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(p1[2] * S * sc2, p1[3] * S * 0.5 * sc2), basic(tex(A.art.vista_mist, { aniso: 4 }), { transparent: true, opacity: op, depthWrite: false }));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(p1[2] * S * sc2, p1[3] * S * 0.5 * sc2), basic(mistTex, { transparent: true, opacity: op, depthWrite: false }));
       m.renderOrder = 15 + i; m.userData = { z, op, phase: ph, y: -0.1 - i * 0.35 };
       sc.add(m); this.mists.push(m);
     });
@@ -118,7 +139,7 @@ export class World {
     // ---- wall of strips (finale) ----
     this.wall = new THREE.Group(); this.wall.visible = false; sc.add(this.wall);
     this.wallPages = [];
-    this.buildWall(this.A.wallMeta);
+    this.buildWall(this.A.wallMeta, this.H > this.W);
     this.noDepth();
   }
 
@@ -171,7 +192,7 @@ export class World {
    * depth layers (mid wall / far wall / a few soft foreground pages). Each page shows its source-language text until the
    * translation wave scans through it, then turns to English.
    */
-  buildWall(meta) {
+  buildWall(meta, vertical = false) {
     const A = this.A, sw = PAGE.w * S, sh = PAGE.h * S;
     const zhTex = tex(A.art.wall_zh, { aniso: this.aniso }), enTex = tex(A.art.wall_en, { aniso: this.aniso });
     const mat = (slot, size, bias, dimK) => new THREE.ShaderMaterial({
@@ -205,7 +226,12 @@ export class World {
     const R = rng(77);
     const hero = [0, wy(PAGE.h / 2)], deck = [];
     const draw = () => { if (!deck.length) { const d = Array.from({ length: meta.pages.length }, (_, i) => i); for (let i = d.length - 1; i > 0; i--) { const j = R.int(0, i); [d[i], d[j]] = [d[j], d[i]]; } deck.push(...d); } return deck.pop(); };
-    const layers = [
+    // 16:9 library is wide; the 9:16 library is a tall column (the camera scrolls up through it, like a manhua feed)
+    const layers = vertical ? [
+      { n: 46, z: [-1.4, -5.5], sc: [0.88, 1.16], xr: 38, yr: 66, gap: 1.4, dimK: 1.0, alpha: 1.0, bias: 0 },
+      { n: 80, z: [-9, -24], sc: [0.9, 1.45], xr: 66, yr: 108, gap: 1.0, dimK: 0.72, alpha: 1.0, bias: 0.6 },
+      { n: 3, z: [3.0, 6.5], sc: [1.0, 1.3], xr: 45, yr: 40, gap: 10.0, dimK: 0.55, alpha: 0.42, bias: 2.2 },
+    ] : [
       { n: 40, z: [-1.4, -5.5], sc: [0.88, 1.16], xr: 72, yr: 50, gap: 1.4, dimK: 1.0, alpha: 1.0, bias: 0 },
       { n: 70, z: [-9, -24], sc: [0.9, 1.45], xr: 120, yr: 78, gap: 1.0, dimK: 0.72, alpha: 1.0, bias: 0.6 },
       { n: 3, z: [3.0, 6.5], sc: [1.0, 1.35], xr: 95, yr: 55, gap: 10.0, dimK: 0.55, alpha: 0.42, bias: 2.2 },
@@ -213,10 +239,21 @@ export class World {
     layers.forEach((L, li) => {
       const placed = li === 0 ? [{ x: hero[0], y: hero[1], w: sw * 1.0, h: sh * 1.0 }] : [];
       let tries = 0;
+      if (vertical && li === 0) {
+        // 9:16: a jittered grid keeps the tall column dense and legible (random rejection left holes the camera could see)
+        const cw = sw * 1.14, ch = sh * 1.1, nx = Math.floor((2 * L.xr) / cw), ny = Math.floor((2 * L.yr) / ch);
+        for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
+          const x = (ix - (nx - 1) / 2) * cw + R.range(-0.35, 0.35), y = hero[1] + (iy - (ny - 1) / 2) * ch + R.range(-0.5, 0.5) + (ix % 2 ? 1.2 : -1.2);
+          if (Math.abs(x - hero[0]) < cw * 0.5 && Math.abs(y - hero[1]) < ch * 0.5) continue;           // the hero page lives here
+          const sc = R.range(0.9, 1.04), crop = R() < 0.2 ? 0.62 : 1;
+          placed.push({ x, y, w: sw * sc, h: sh * sc * crop, sc, crop });
+        }
+        tries = 1e9;
+      }
       while (placed.length - (li === 0 ? 1 : 0) < L.n && tries++ < 9000) {
         const sc = R.range(...L.sc), crop = R() < 0.24 ? 0.62 : 1, w = sw * sc, h = sh * sc * crop;
         const x = R.range(-L.xr, L.xr), y = hero[1] + R.range(-L.yr, L.yr);
-        if (li === 2 && Math.abs(x) < 34) continue;                                                  // foreground pages stay at the frame edges
+        if (li === 2 && Math.abs(x) < (vertical ? 13 : 34)) continue;                                                  // foreground pages stay at the frame edges
         if (placed.some((q) => Math.abs(x - q.x) < (w + q.w) / 2 + L.gap && Math.abs(y - q.y) < (h + q.h) / 2 + L.gap)) continue;
         placed.push({ x, y, w, h, sc, crop });
       }

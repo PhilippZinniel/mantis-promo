@@ -25,7 +25,7 @@ print('integrated', re.findall(r'I:\s+(-?[\d.]+) LUFS', out)[-1], 'LUFS | LRA', 
 b = sg.butter(3, [1500, 6000], 'band', fs=sr, output='sos'); low = sg.sosfilt(b, m)
 env = np.sqrt(np.convolve(low ** 2, np.ones(48) / 48, 'same')); d = np.diff(env, prepend=0) * sr
 print('cue alignment (nearest transient onset within +-120 ms):')
-for name in ['slash', 'titleRead', 'titleThe', 'titleWhole', 'titlePage', 'strike', 'stays', 'paper', 'lock']:
+for name in ['slash', 'titleRead', 'titleThe', 'titleWhole', 'titlePage', 'strike', 'paper', 'lock']:    # ('stays' is a sub-bass hit: not visible to the transient band)
     c = K[name] + (1.0 if name == 'stays' else 0)
     w = (np.arange(len(d)) / sr > c - 0.12) & (np.arange(len(d)) / sr < c + 0.12)
     if not w.any(): continue

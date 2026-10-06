@@ -1,8 +1,11 @@
 # Mantis — promotional film (code-authored)
 
-**`mantis_promo_1080p60.mp4`** — 32 s · 1920×1080 · 60 fps · H.264 (High, yuv420p, BT.709) · AAC stereo 48 kHz
-`mantis_promo_poster.png` — poster frame (the locked logo at 30.4 s)
+**`mantis_promo_1080p60.mp4`** — 34 s · 1920×1080 · 60 fps · H.264 (High, yuv420p, BT.709) · AAC stereo 48 kHz
+`mantis_promo_vertical_1080x1920_60.mp4` — native 9:16 recomposition (same timeline, audio and assets; shots re-framed, not cropped)
+`mantis_promo_poster.png` — poster frame (the locked logo at 31.6 s)
 `mantis_promo_contact_sheet.jpg` — one frame per second, used for QA
+
+> **v1.1** (see [What changed in v1.1](#what-changed-in-v11)) — a polish pass on [v1.0.0](../../releases/tag/v1.0.0), which is preserved unchanged.
 
 The rendered files are **not tracked in git** — they are published as assets on the
 [GitHub Releases](../../releases) page (`output/` is gitignored and is where `./tools/build_all.sh` writes them locally).
@@ -17,20 +20,21 @@ rebuilding the text **without touching the art**. The film dramatises that as a 
 
 1. **Unread** (0–3.2 s) — a night-time shan-shui panel (ink pillars, halftone moon) assembling in depth, with a vertical
    Chinese caption written in. A hairline of mantis-green cuts the frame…
-2. **Read** (3.2–17 s) — …and the slash splits the shot open onto the whole manhua page, floating in the dark. Green blade
+2. **Read** (3.2–19 s) — …and the slash splits the shot open onto the whole manhua page, floating in the dark. Green blade
    brackets *read* each region; brush-ribbon "context threads" tie the caption, the question, and the answer together.
-   `READ THE WHOLE PAGE.` is typeset in space behind the strip. The film then makes its one joke: a context-free word
-   gloss — **`HAVE.`** / *still have more.* — is struck through and replaced by the answer in context, **`YES.`** On the film's
-   second strike the Chinese text melts like wet ink into English, in place, in the same bubble shapes. The page is rebuilt.
-3. **Respect** (17–26 s) — **`WORDS CHANGE. THE ART STAYS.`** The text layer lifts off the art in depth, and a green
-   line-trace proves the artwork underneath was never touched. The camera pulls back to a wall of pages that light up
-   one after another — *more worlds*. A diagonal blade wipes dark to paper white and the supplied logo is assembled from its own
+   `READ THE WHOLE PAGE.` is typeset in space behind the strip. The film then makes its one joke: with only the isolated
+   source word to go on, the answer bubble's English reel cycles through unsure candidates (**`HAVE.` `OWN.` `EXIST.`**) —
+   then context travels down the thread from the question and the reel locks onto **`YES.`** On the film's strike the Chinese
+   text melts like wet ink into English, in place, in the same bubble shapes — and the page is held, whole, long enough to read.
+3. **Respect** (19–28 s) — **`WORDS CHANGE. THE ART STAYS.`** The text layer lifts off the art in depth, and a green
+   line-trace proves the artwork underneath was never touched. The camera pulls back into a *library* of distinct pages whose
+   text turns to English one after another as a scan-line passes — *more worlds*. A diagonal blade wipes dark to paper white and the supplied logo is assembled from its own
    parts (ring crescents sweep, the mantis' arms slice in, head lands, `Mantis` rises through its baseline, the leaf-slash of the
    M flies in as the final strike) and settles on **TRANSLATE • SHARE • MORE WORLDS** — the tagline from the supplied logo.
 
 Motion language comes from the brand: diagonal manga-panel cuts, the slash geometry of the wordmark, green-on-ink, halftone
 and ink wash, the leaf. Hits are on-grid at 120 BPM (0.5 s beats) and the picture and the sound are authored from the same time
-constants (3.2 s slash, 8.0–9.5 s title hits, 12.0 s strike, 17.45/17.65 s and 19.6/19.8 s title hits, 26.0 s paper opens, 28.0 s lock).
+cue sheet, [`src/cues.json`](src/cues.json) (3.2 s slash, 8.0–9.5 s title hits, 13.0 s strike, 28.0 s paper opens, 30.0 s lock-up).
 
 ### What the film does and does not claim
 
@@ -46,26 +50,47 @@ product demo:
 * All on-screen story text is original copy written for the film (a fictional "is there another world beyond these mountains?" exchange).
 * No fixtures, evaluation data, sealed/TEST material or repository content was used; the Mantis repo was only read, never modified.
 
+## What changed in v1.1
+
+Findings from watching the v1.0 render at playback speed, and what was done (a smaller set of clear wins; some candidates were rejected — see the release notes):
+
+* **The context gag now reads in under a second.** v1.0's *HAVE. / STILL HAVE MORE.* was linguistically arbitrary and on screen for ~0.5 s. It is now a
+  three-word candidate reel in the source bubble (the Chinese is still visible), and the answer *travels down the thread from the question* as the reel locks onto **YES.**
+* **The rebuilt page can be read.** v1.0 visited the rebuilt bubbles one at a time with whip-pans between them; v1.1 frames both together and holds the page, with only a slow drift, for ~2.6 s.
+* **Camera flows.** The track is a monotone-cubic spline that carries velocity through keys (v1.0 eased to a stop at every key). All four whip-pans (> 60 px/frame in v1.0) were removed.
+* **The finale is a library, not a tile.** 12 distinct synthetic pages (layouts, scenes, moods, bubble placements; crops, rotations, depth) replace 84 copies of the hero page;
+  the translation scan now converts each page's text from Chinese to English as it passes.
+* **Visual rhythm.** The long dark stretch is broken up by light-ink and bright-green pages in the finale and a calmer, more spacious S5; the title is held ~1 s longer; bloom no longer lifts the blacks; shake is reserved for the big beats.
+* **Brand payoff.** The banner motifs around the logo are quieter and the tagline is larger. The lock-up timing is unchanged (it is built on the beat at 30.0 s and held ~4 s).
+* **Score.** One recurring motif and a clear arc (quiet intro → build → title → strike → hold → calm "art stays" → big build → paper → resolve); ~35 % fewer onsets per second (1.4 vs 2.3); deliberate silences before the biggest hits; gentler high-frequency blade sounds; a final chord that arrives suspended and resolves half a bar later; more dynamic range (9 vs 6 LU) at a lower overall loudness.
+* **Engineering.** One shared cue sheet; `npm ci` + pinned Python (`requirements.in` → `requirements.txt`, `.python-version`) and consistent docs; the clean-checkout build was exercised and a missing-directory bug fixed; runtime and audio QA scripts.
+* **New:** native 1080×1920 vertical version.
+
 ## Technical approach
 
 | Layer | Implementation |
 |---|---|
 | Renderer | Deterministic, frame-addressed: `Film.renderAt(t)` is a pure function of time. Headless Chromium (Playwright) draws each frame; 5 workers each own a contiguous frame range and pipe PNG frames into their own ffmpeg H.264 encoder; the chunks are stream-copied into one file (the film is encoded exactly once, CRF 19). |
-| 3D | three.js (WebGL, Metal/ANGLE): the manhua strip is a textured plane in a perspective world with a physical camera path (yaw/pitch/roll/fov, off-axis shifts), a keyframed camera track, a lifting text layer, depth fog, and a wall of 84 strips with a custom "scan-line translation" shader. Depth testing is disabled and ordering is explicit (avoids stacked-alpha tile artifacts on Apple GPUs). |
+| 3D | three.js (WebGL, Metal/ANGLE): the manhua strip is a textured plane in a perspective world with a physical camera path (yaw/pitch/roll/fov, off-axis shifts), a keyframed camera track, a lifting text layer, depth fog, and a library of 113 page planes (12 distinct synthetic pages, each reused with its own crop, scale, tilt, depth and scan timing, in three depth layers) with a custom "scan-line translation" shader. The camera is a monotone-cubic (PCHIP) track with log-space zoom, so it flows through its keys instead of stopping at each. Depth testing is disabled and ordering is explicit (avoids stacked-alpha tile artifacts on Apple GPUs). |
 | 2D | Canvas 2D for everything that must stay locked to the art but be resolution-independent: blade brackets, tapered brush threads, kinetic type with slanted-wipe reveals, brush strokes, silhouette trace, blade-wipe transition, the logo assembly. Overlays are projected from the 3D camera so they never slide off the art. |
-| Art | All panel art is procedural (`src/art/landscape.js`): ink-wash karst pillars, halftone moon, fog, pines, traveler, brand-green leaf blades — baked in separate depth layers for parallax. |
+| Art | All panel art is procedural (`src/art/landscape.js`, `src/art/pages.js`): ink-wash karst pillars, halftone moon, fog, pines, traveler, brand-green leaf blades — baked in separate depth layers for parallax. `pages.js` composes the finale's library: 7 landscape kinds, 7 panel layouts and 4 moods, each baked in a Chinese and an English edition. |
 | Text | Original bilingual speech bubbles (`src/strip.js`) drawn in canvas; the Chinese→English transition is a blur+threshold "ink-melt" of both typesettings. |
 | Logo | `tools/extract_logo.py` mattes `assets/logo.png` (flat ~#F7F8F7 background → proper alpha with edge-colour decontamination, so no white box/fringe on any background) and splits it into emblem parts, ring crescents, each wordmark glyph, the M leaf-slash and the tagline. The original artwork is not altered; parts are only animated/placed. |
-| Motion blur | Camera-velocity-adaptive temporal supersampling (1–12 sub-frames, 0.5 shutter; 0.22 on the blade wipe). Impacts add decaying camera shake; the 12.0 s strike has a 2-frame monochrome impact frame. |
-| Audio | `tools/audio.py` — fully procedural: additive plucks/bells, pitch-swept toms and sub, STFT-swept noise whooshes, metallic blade "shings", a synthetic convolution reverb, sidechain ducking, glue saturation. ≈ −16.7 LUFS integrated, −1.8 dBFS peak. Hits were verified against the final file (low-band onset detection lands on the visual events). |
+| Motion blur | Camera-velocity-adaptive temporal supersampling (1–12 sub-frames, 0.5 shutter; 0.22 on the blade wipe). Impacts add decaying camera shake — reserved for the biggest beats; the 13.0 s strike has a 2-frame monochrome impact frame. Bloom is thresholded, so it only lifts bright elements (blacks stay black). |
+| Audio | `tools/audio.py` — fully procedural: additive plucks/bells, pitch-swept toms and sub, STFT-swept noise whooshes, softened blade "shings", a synthetic convolution reverb, sidechain ducking, deliberate dropouts before the big hits, glue saturation. One four-note rising motif (D–F–A–C→D) recurs from the caption write-on to the lit logo; the harmony resolves (Dsus4 → D) at the lock-up. ≈ −18.3 LUFS integrated, 9 LU loudness range, −1.7 dBFS peak. `tools/qa_audio.py` checks loudness, onset density, high-frequency share, clicks and cue alignment against the final file. |
+| Vertical | `?v=1` switches the same engine to 1080×1920: its own camera track, title/headline layouts, a tall column library for the finale, and a re-composed logo lock-up. The shared timeline and score are unchanged. |
 
 ## Re-render
 
-Requirements: macOS/Linux, Node ≥ 20, Python ≥ 3.11 (+ [`uv`](https://docs.astral.sh/uv/)), ffmpeg with libx264.
+Requirements: macOS (developed and validated on Apple Silicon; Linux with a working headless-Chromium WebGL should also work), Node ≥ 20,
+[`uv`](https://docs.astral.sh/uv/), ffmpeg/ffprobe with libx264. Python 3.13 is provisioned automatically by `uv` (see `.python-version`).
+Dependencies are pinned: `package-lock.json` (installed with `npm ci`) and `requirements.txt` (frozen from `requirements.in`).
 
 ```bash
-./tools/build_all.sh            # installs deps, regenerates all derived assets + audio, renders, muxes, writes the poster
+./tools/build_all.sh              # installs deps, regenerates all derived assets + audio, renders 16:9 + 9:16, muxes, writes poster + contact sheet
+CLEAN=1 ./tools/build_all.sh      # same, from a wiped node_modules / .venv / build (full clean rebuild, ~2.5 min on an Apple M5)
 SKIP_RENDER=1 ./tools/build_all.sh   # only derived assets + audio
+SKIP_VERTICAL=1 ./tools/build_all.sh # skip the 9:16 render
 ```
 
 Useful dev commands:
@@ -73,20 +98,28 @@ Useful dev commands:
 ```bash
 node tools/stills.mjs build/s 3.3 12.0 28.0      # render single frames at given seconds
 node tools/render.mjs --from 0 --to 120 --out build/test.mp4   # render a frame range
-node tools/render.mjs --poster 30.4 output/poster.png
-python tools/audio.py                            # re-synthesise build/audio.wav
+node tools/render.mjs --poster 31.6 output/poster.png
+node tools/render.mjs --vertical --out build/v.mp4               # 9:16 (also: node tools/stills.mjs --vertical dir t…)
+node tools/render.mjs --hash build/h.txt …                       # per-frame SHA-1 (determinism checks); --dump dir writes PNGs
+node tools/check_runtime.mjs                                     # fails on console errors, external requests or missing fonts
+python tools/audio.py && python tools/qa_audio.py [file]         # re-synthesise build/audio.wav / audit loudness + cue alignment
 ```
 
-Frame/time constants live in `src/film.js` (camera keys, shot timing), `src/logoScene.js` (logo reveal, `LOGO_T0`), and
-`tools/audio.py` (cue list). Render time on an Apple M5: ~70 s for all 1,920 frames.
+Timing lives in **one place**, [`src/cues.json`](src/cues.json): `src/film.js`, `src/logoScene.js` and `tools/audio.py` all read it, so a cue moved
+there moves picture and sound together. Camera keys are in `Film.camKeys()` / `camKeysV()`. Render time on an Apple M5: ~65 s per 2,040-frame render.
+
+**Determinism.** `Film.renderAt(t)` is a pure function of time (seeded RNG, no wall-clock). A fresh session renders any frame bit-identically;
+across two full parallel renders, the GPU's float jitter leaves ≤ 0.003 % of pixels in affected frames differing by at most 6/255 (none above 16) — invisible
+and below the encoder's quantisation.
 
 ## Layout
 
 ```
 assets/                supplied brand assets (read-only: logo.png, banner.png, notice.png)
-src/                   film source: index.html, main.js, film.js (director), world.js (3D), fx.js (2D primitives),
-                       strip.js (page + bubbles), logoScene.js, art/landscape.js (procedural art), lib/util.js
-tools/                 render.mjs, stills.mjs, make_art.mjs, extract_logo.py, extract_brand.py, make_trace.py, audio.py, build_all.sh
+src/                   film source: index.html, main.js, cues.json (shared timeline), film.js (director), world.js (3D), fx.js (2D primitives),
+                       strip.js (page + bubbles), logoScene.js, art/landscape.js + art/pages.js (procedural art), lib/util.js
+tools/                 render.mjs, stills.mjs, make_art.mjs, extract_logo.py, extract_brand.py, make_trace.py, audio.py, qa_audio.py,
+                       check_runtime.mjs, contact_sheet.py, build_all.sh
 build/                 generated, regenerable intermediates (art layers, logo parts, banner panels, audio.wav)
 output/                rendered deliverables (gitignored; published as GitHub Release assets)
 ```

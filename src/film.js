@@ -11,9 +11,9 @@ import { wx, wy } from './world.js';
 // stopping at each one. Zoom is interpolated in log space (constant perceived zoom speed). A key can be `rest: true`
 // (zero velocity: a real hold), and a segment can carry a legacy easing `e` (used only for the opening landing).
 // ---------------------------------------------------------------------------------------------------
-const CH = ['u', 'v', 'yaw', 'pitch', 'roll', 'sx', 'ld'];
+const CH = ['u', 'v', 'yaw', 'pitch', 'roll', 'sx', 'sy', 'ld'];
 export function makeTrack(rawKeys) {
-  const keys = rawKeys.map((k) => ({ sx: 0, ...k, ld: Math.log(k.d) }));
+  const keys = rawKeys.map((k) => ({ sx: 0, sy: 0, ...k, ld: Math.log(k.d) }));
   const n = keys.length;
   keys.forEach((k, i) => {
     k.m = {};
@@ -37,7 +37,7 @@ export function makeTrack(rawKeys) {
     for (const c of CH) out[c] = h00 * a[c] + h10 * h * a.m[c] + h01 * b[c] + h11 * h * b.m[c];
     return finish(out);
   };
-  function finish(k) { const o = { z: 0 }; for (const c of ['u', 'v', 'yaw', 'pitch', 'roll', 'sx']) o[c] = k[c]; o.d = Math.exp(k.ld); return o; }
+  function finish(k) { const o = { z: 0 }; for (const c of ['u', 'v', 'yaw', 'pitch', 'roll', 'sx', 'sy']) o[c] = k[c]; o.d = Math.exp(k.ld); return o; }
 }
 
 const expDecay = (t, t0, rate = 6) => (t < t0 ? 0 : Math.exp(-(t - t0) * rate));
@@ -51,6 +51,8 @@ export class Film {
     this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.world = world; this.A = assets;
     this.K = assets.cues.t;
     this.W = canvas.width; this.H = canvas.height; this.fps = assets.cues.fps; this.dur = assets.cues.duration;
+    this.V = this.H > this.W;                                   // 9:16 recomposition (?v=1)
+    this.DS = Math.hypot(this.W, this.H) / Math.hypot(1920, 1080);    // screen-diagonal scale for pixel-space moves
     const mk = () => { const c = document.createElement('canvas'); c.width = this.W; c.height = this.H; return c; };
     this.bufA = mk(); this.bufB = mk(); this.accum = mk(); this.bufS = mk();
     this.ca = this.bufA.getContext('2d'); this.cb = this.bufB.getContext('2d');
@@ -61,17 +63,27 @@ export class Film {
   }
 
   setupType() {
-    const w = this.world, F = '900 italic {size}px "Exo 2"';
-    const mk = (name, text, x, y, color = '#F7F8F7', align = 'left') => {
-      const T = w.addType(name, { text, font: F, size: 400, color, z: -4, align, pad: 40, letterSpacing: -5 });
-      T.mesh.position.set(x(T.w), y, -4);
+    const w = this.world, F = '900 italic {size}px "Exo 2"', V = this.V;
+    const mk = (name, text, x, y, color = '#F7F8F7', scale = 1) => {
+      const T = w.addType(name, { text, font: F, size: 400, color, z: -4, align: 'left', pad: 40, letterSpacing: -5, scale });
+      T.mesh.position.set(x(T.w), y, -4); T.baseY = y; T.sc = scale;
       T.mesh.visible = false;
       return T;
     };
-    mk('read', 'READ', (tw) => -6.9 - tw / 2, -8.6);
-    mk('the', 'THE', (tw) => -6.9 - tw / 2, -12.2);
-    mk('whole', 'WHOLE', (tw) => 6.9 + tw / 2, -8.6, '#7CC326');
-    mk('page', 'PAGE.', (tw) => 6.9 + tw / 2, -12.2);
+    if (!V) {
+      mk('read', 'READ', (tw) => -6.9 - tw / 2, -8.6);
+      mk('the', 'THE', (tw) => -6.9 - tw / 2, -12.2);
+      mk('whole', 'WHOLE', (tw) => 6.9 + tw / 2, -8.6, '#7CC326');
+      mk('page', 'PAGE.', (tw) => 6.9 + tw / 2, -12.2);
+    } else {
+      // vertical: the page fills the frame, so the title is stacked above ("READ THE") and below ("WHOLE PAGE.") it
+      const sc = 0.47, top = 4.5, bot = -25.9, gap = -0.1, wd = { read: 14.26, the: 10.56, whole: 18.91, page: 15.02 };
+      const l1 = (wd.read + wd.the) * sc + gap, l2 = (wd.whole + wd.page) * sc + gap;
+      mk('read', 'READ', (tw) => -l1 / 2 + tw / 2, top, '#F7F8F7', sc);
+      mk('the', 'THE', (tw) => -l1 / 2 + wd.read * sc + gap + tw / 2, top, '#F7F8F7', sc);
+      mk('whole', 'WHOLE', (tw) => -l2 / 2 + tw / 2, bot, '#7CC326', sc);
+      mk('page', 'PAGE.', (tw) => -l2 / 2 + wd.whole * sc + gap + tw / 2, bot, '#F7F8F7', sc);
+    }
   }
 
   // =================================================================================================
@@ -166,7 +178,7 @@ export class Film {
       return;
     }
     if (t >= K.wipe) {
-      if (t < K.wipe + 0.7) { this.shotWorld(this.ca, t); this.logo.draw(this.cb, t); bladeWipe(ctx, this.bufA, this.bufB, prog(t, K.wipe, K.wipe + 0.65), W, H); }
+      if (t < K.wipe + 0.7) { this.shotWorld(this.ca, t); this.logo.draw(this.cb, t); bladeWipe(ctx, this.bufA, this.bufB, prog(t, K.wipe, K.wipe + 0.65), W, H, this.DS); }
       else this.logo.draw(ctx, t);
       return;
     }
@@ -189,7 +201,9 @@ export class Film {
   // =================================================================================================
   shotVista(ctx, t) {
     const w = this.world, K = this.K, p = prog(t, 0, K.slash + 0.2);
-    const cam = { u: 560, v: 322, d: lerp(10.2, 9.9, ease.inOutQuad(p)), yaw: lerp(1.2, -1.0, ease.inOutQuad(p)), pitch: lerp(-0.6, 0.8, p), roll: 0 };
+    const e = ease.inOutQuad(p);
+    const cam = this.V ? { u: lerp(800, 812, e), v: 396, d: lerp(12.5, 12.1, e), yaw: lerp(1.4, -0.8, e), pitch: lerp(-0.3, 0.4, p), roll: 0 }
+      : { u: 560, v: 322, d: lerp(10.2, 9.9, e), yaw: lerp(1.2, -1.0, e), pitch: lerp(-0.6, 0.8, p), roll: 0 };
     w.setCamera(cam);
     w.setLayers(1, { d0: 10.5, c0: [0, -3.18] });
     const reveal = [[0.2, 1.8], [0.7, 2.1], [0.9, 2.4], [1.2, 2.6], [1.0, 2.0]];
@@ -209,6 +223,11 @@ export class Film {
     ctx.filter = 'contrast(1.14) brightness(0.9) saturate(1.08)';
     ctx.drawImage(w.renderer.domElement, 0, 0);
     ctx.filter = 'none';
+    if (this.V) {                                    // 9:16: the 4:3 vista is taller than wide in frame -- the abyss swallows its lower edge
+      const g = ctx.createLinearGradient(0, this.H * 0.6, 0, this.H * 0.93);
+      g.addColorStop(0, 'rgba(4,9,8,0)'); g.addColorStop(0.55, 'rgba(4,9,8,0.7)'); g.addColorStop(1, 'rgba(4,9,8,1)');
+      ctx.fillStyle = g; ctx.fillRect(0, this.H * 0.6, this.W, this.H * 0.4);
+    }
   }
 
   bubbleStates(map) {
@@ -226,7 +245,7 @@ export class Film {
     const a = prog(t, K.slash - 0.2, K.slash - 0.04);
     if (a <= 0) return;
     const ang = -1.05, cx = W * 0.58, cy = H * 0.5, hp = halfPlanes(W, H, cx, cy, ang);
-    const L = 1500, d = hp.d;
+    const L = 1500 * this.DS, d = hp.d;
     const x0 = cx - d[0] * L, y0 = cy - d[1] * L, x1 = cx + d[0] * L, y1 = cy + d[1] * L;
     const e = ease.strike(a);
     ctx.save();
@@ -241,7 +260,7 @@ export class Film {
   slashSplit(ctx, buf, t) {
     const { W, H, K } = this, T = K.slash;
     const ang = -1.05, cx = W * 0.58, cy = H * 0.5;
-    const open = 120 * ease.outExpo(prog(t, T, T + 0.16)) + 1500 * ease.inCubic(prog(t, T + 0.14, T + 0.75));
+    const open = 120 * ease.outExpo(prog(t, T, T + 0.16)) + 1500 * this.DS * ease.inCubic(prog(t, T + 0.14, T + 0.75));
     const slide = 60 * ease.outExpo(prog(t, T, T + 0.3));
     const hp = halfPlanes(W, H, cx, cy, ang);
     const [nx, ny] = hp.n, [dx, dy] = hp.d;
@@ -287,6 +306,7 @@ export class Film {
   // =================================================================================================
   camKeys() {
     const K = this.K;
+    if (this.V) return this.camKeysV();
     return [
       // S2 — land on the page, read it, glide down to the answer
       { t: K.slash, u: 560, v: 520, d: 38, yaw: -18, pitch: 10, roll: -8, e: ease.cam },
@@ -314,6 +334,36 @@ export class Film {
       { t: K.wallIn + 2.1, u: 550, v: 1000, d: 72, yaw: -6, pitch: 7, roll: -3.5, sx: 0 },
       { t: K.wipe - 0.6, u: 548, v: 1050, d: 122, yaw: -4.5, pitch: 8, roll: -4 },
       { t: K.wipe + 0.6, u: 548, v: 1056, d: 128, yaw: -4.2, pitch: 8, roll: -4.2, rest: true },
+    ];
+  }
+  /**
+   * Vertical (9:16) camera. The page is almost exactly 9:16, so most shots simply frame what must be read: dW(units) is the camera
+   * distance at which `units` of page width fills the frame. sy shifts the scene down so the type has the top of the frame.
+   */
+  camKeysV() {
+    const K = this.K, dW = (units) => units / 30.15;
+    return [
+      { t: K.slash, u: 600, v: 520, d: 62, yaw: -18, pitch: 10, roll: -8, e: ease.cam },
+      { t: 4.3, u: 520, v: 640, d: dW(980), yaw: -8, pitch: 3, roll: -2.2 },
+      { t: 5.4, u: 510, v: 650, d: dW(930), yaw: -5, pitch: 2, roll: -1.4 },
+      { t: 6.3, u: 770, v: 900, d: dW(780), yaw: 0.5, pitch: 0.4, roll: 0.2 },
+      { t: K.pullback, u: 852, v: 1012, d: dW(560), yaw: 4, pitch: -0.8, roll: 0.5, rest: true },
+      { t: K.titleRead, u: 552, v: 1066, d: 64, yaw: -1, pitch: 0, roll: -4, rest: true },
+      { t: K.titlePage, u: 553, v: 1066, d: 66, yaw: -1.4, pitch: 0, roll: -4.6 },
+      { t: K.titleEnd, u: 553, v: 1060, d: 63, yaw: -1, pitch: 0, roll: -3.8 },
+      { t: K.glossHave + 0.1, u: 600, v: 780, d: dW(1060), yaw: -3, pitch: 1, roll: -1.2 },
+      { t: K.strike, u: 590, v: 760, d: dW(1000), yaw: -2.4, pitch: 0.8, roll: -0.9 },
+      { t: K.strike + 1.4, u: 520, v: 740, d: dW(1060), yaw: -3, pitch: 1.4, roll: -0.5 },
+      { t: K.toAnswer, u: 524, v: 700, d: dW(1010), yaw: -2.2, pitch: 1.1, roll: -0.4 },
+      { t: K.andMore + 0.55, u: 846, v: 1008, d: dW(520), yaw: 3.5, pitch: -0.6, roll: 0.4, rest: true },
+      { t: K.s5Pull, u: 846, v: 1008, d: dW(505), yaw: 3.5, pitch: -0.6, roll: 0.4, rest: true },
+      { t: K.words, u: 560, v: 340, d: dW(1190), yaw: -24, pitch: 8, roll: 1.2, sy: 0.07, rest: true },
+      { t: K.words + 1.4, u: 558, v: 350, d: dW(1160), yaw: -16, pitch: 6, roll: 0.8, sy: 0.07 },
+      { t: K.words + 2.6, u: 556, v: 430, d: dW(1100), yaw: -8, pitch: 3, roll: 0, sy: 0.05 },
+      { t: K.wallIn, u: 552, v: 720, d: 44, yaw: -6, pitch: 4, roll: -1.5, sy: 0.05 },
+      { t: K.wallIn + 2.1, u: 552, v: 150, d: 78, yaw: -5, pitch: 6, roll: -3, sy: 0 },
+      { t: K.wipe - 0.6, u: 548, v: -700, d: 104, yaw: -4, pitch: 7, roll: -3.6 },
+      { t: K.wipe + 0.6, u: 548, v: -1000, d: 108, yaw: -4, pitch: 7, roll: -3.8, rest: true },
     ];
   }
   cameraAt(t) { return this.camera(t); }
@@ -354,7 +404,7 @@ export class Film {
       o.mesh.visible = k > 0 && out < 1;
       u.reveal.value = ease.outQuart(k);
       u.alpha.value = 1 - out;
-      o.mesh.position.y = (name === 'read' || name === 'whole' ? -8.6 : -12.2) - (1 - ease.outQuart(k)) * 0.9;
+      o.mesh.position.y = o.baseY - (1 - ease.outQuart(k)) * 0.9 * o.sc;
     });
   }
 
@@ -419,14 +469,14 @@ export class Film {
   s5Type(ctx, t) {
     const K = this.K;
     if (t < K.words - 0.1 || t > K.textOut + 0.4) return;
-    const x = 96, y1 = 410, y2 = 560, SZ = 136;
+    const V = this.V, x = V ? 70 : 96, y1 = V ? 300 : 410, y2 = V ? 470 : 560, SZ = V ? 150 : 136, ks = SZ / 136;
     const g = '#7CC326';
     slicedText(ctx, 'WORDS', x, y1, { size: SZ, reveal: prog(t, K.words, K.words + 0.35), out: prog(t, K.wordsOut, K.wordsOut + 0.35) });
     slicedText(ctx, 'CHANGE.', x, y2, { size: SZ, reveal: prog(t, K.change, K.change + 0.4), out: prog(t, K.wordsOut + 0.05, K.wordsOut + 0.4) });
-    if (t < K.theArt) brushStroke(ctx, x - 6, y2 + 28, x + 730, y2 + 20, { k: ease.outCubic(prog(t, K.change + 0.4, K.change + 0.9)), width: 24, seed: 4 });
+    if (t < K.theArt) brushStroke(ctx, x - 6, y2 + 28, x + 730 * ks, y2 + 20, { k: ease.outCubic(prog(t, K.change + 0.4, K.change + 0.9)), width: 24, seed: 4 });
     slicedText(ctx, 'THE ART', x, y1, { size: SZ, reveal: prog(t, K.theArt, K.theArt + 0.35), out: prog(t, K.textOut - 0.05, K.textOut + 0.3) });
     slicedText(ctx, 'STAYS.', x, y2, { size: SZ, reveal: prog(t, K.stays, K.stays + 0.4), out: prog(t, K.textOut, K.textOut + 0.35), color: g });
-    if (t >= K.stays + 0.1 && t < K.textOut + 0.4) brushStroke(ctx, x - 6, y2 + 28, x + 580, y2 + 22, { k: ease.outCubic(prog(t, K.stays + 0.4, K.stays + 0.9)), width: 22, seed: 9, color: '#F7F8F7' });
+    if (t >= K.stays + 0.1 && t < K.textOut + 0.4) brushStroke(ctx, x - 6, y2 + 28, x + 580 * ks, y2 + 22, { k: ease.outCubic(prog(t, K.stays + 0.4, K.stays + 0.9)), width: 22, seed: 9, color: '#F7F8F7' });
   }
 
   threads(ctx, t) {

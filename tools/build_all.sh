@@ -4,6 +4,7 @@
 #   SKIP_RENDER=1 ./tools/build_all.sh        only regenerate supporting assets + audio
 #   CLEAN=1 ./tools/build_all.sh              wipe node_modules/.venv/build first (fully clean rebuild)
 #   WORKERS=5 CRF=19 ./tools/build_all.sh     renderer parallelism / H.264 quality
+#   SKIP_VERTICAL=1 ./tools/build_all.sh      skip the native 1080x1920 recomposition
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,5 +30,9 @@ if [ -z "${SKIP_RENDER:-}" ]; then
   ffmpeg -y -loglevel error -i build/video.mp4 -i build/audio.wav -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart -shortest output/mantis_promo_1080p60.mp4
   node tools/render.mjs --poster "$(python -c "import json;print(json.load(open('src/cues.json'))['t']['lock']+1.6)")" output/mantis_promo_poster.png
   python tools/contact_sheet.py output/mantis_promo_1080p60.mp4 output/mantis_promo_contact_sheet.jpg
-  echo "done -> output/mantis_promo_1080p60.mp4"
+  if [ -z "${SKIP_VERTICAL:-}" ]; then
+    node tools/render.mjs --vertical --workers "${WORKERS:-5}" --crf "${CRF:-19}" --out build/video_vertical.mp4
+    ffmpeg -y -loglevel error -i build/video_vertical.mp4 -i build/audio.wav -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart -shortest output/mantis_promo_vertical_1080x1920_60.mp4
+  fi
+  echo "done -> output/"
 fi

@@ -216,9 +216,9 @@ export function brushStroke(ctx, x0, y0, x1, y1, { width = 26, k = 1, color = PA
 }
 
 /** diagonal blade wipe from scene A to scene B (B revealed behind the sweeping blade) */
-export function bladeWipe(ctx, A, B, k, W, H) {
+export function bladeWipe(ctx, A, B, k, W, H, S = 1) {
   const ang = -1.08, cx = W / 2, cy = H / 2;
-  const e = ease.inOutCubic(clamp(k)), o = lerp(-1500, 1500, e);
+  const e = ease.inOutCubic(clamp(k)), o = lerp(-1500 * S, 1500 * S, e);
   const hp = halfPlanes(W, H, cx, cy, ang, o);
   ctx.drawImage(A, 0, 0);
   ctx.save(); ctx.clip(polyPath(hp.neg)); ctx.drawImage(B, 0, 0); ctx.restore();
@@ -226,7 +226,7 @@ export function bladeWipe(ctx, A, B, k, W, H) {
   const [nx, ny] = hp.n;
   ctx.save();
   ctx.translate(cx + nx * o, cy + ny * o); ctx.rotate(ang);
-  const L = 1900, wMax = 170 * Math.sin(Math.PI * clamp(k)) ** 0.6 + 30;
+  const L = 1900 * S, wMax = 170 * Math.sin(Math.PI * clamp(k)) ** 0.6 + 30;
   const g = ctx.createLinearGradient(0, -wMax, 0, wMax);
   g.addColorStop(0, 'rgba(240,255,220,0.0)'); g.addColorStop(0.35, 'rgba(160,240,80,0.55)'); g.addColorStop(0.62, GREEN_HI); g.addColorStop(0.9, '#1d4a1c'); g.addColorStop(1, '#0d1f12');
   ctx.shadowColor = 'rgba(160,240,80,0.9)'; ctx.shadowBlur = 40;

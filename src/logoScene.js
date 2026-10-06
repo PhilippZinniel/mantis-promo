@@ -13,6 +13,7 @@ const HEAD_C = [745, 392];
 export class LogoScene {
   constructor(assets, W = 1920, H = 1080, t0 = 28.02) {
     this.t0 = t0;                       // film time at which the logo build starts (lock-up = t0 + 1.98)
+    this.V = H > W;                     // 9:16 recomposition
     this.A = assets; this.W = W; this.H = H; this.P = assets.logoMeta.parts; this.L = assets.logo; this.B = assets.brand;
     const mk = (w = W, h = H) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
     this.tmp = mk(); this.tctx = this.tmp.getContext('2d');
@@ -21,13 +22,14 @@ export class LogoScene {
   }
 
   makePaper() {
-    const c = document.createElement('canvas'); c.width = 1920; c.height = 1080; const x = c.getContext('2d');
-    x.fillStyle = PAL.paper; x.fillRect(0, 0, 1920, 1080);
+    const { W, H } = this;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = PAL.paper; x.fillRect(0, 0, W, H);
     const R = rng(404);
-    for (let i = 0; i < 4200; i++) { x.strokeStyle = `rgba(110,125,112,${R.range(0.012, 0.04)})`; x.lineWidth = R.range(0.3, 0.9); const px = R() * 1920, py = R() * 1080, a = R() * TAU, l = R.range(3, 16); x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke(); }
+    for (let i = 0; i < Math.round(4200 * W * H / (1920 * 1080)); i++) { x.strokeStyle = `rgba(110,125,112,${R.range(0.012, 0.04)})`; x.lineWidth = R.range(0.3, 0.9); const px = R() * W, py = R() * H, a = R() * TAU, l = R.range(3, 16); x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke(); }
     // soft centre light
-    const g = x.createRadialGradient(960, 520, 100, 960, 540, 1100); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(225,232,224,0.35)');
-    x.fillStyle = g; x.fillRect(0, 0, 1920, 1080);
+    const R0 = Math.max(W, H) * 0.57, g = x.createRadialGradient(W / 2, H * 0.48, 100, W / 2, H * 0.5, R0); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(225,232,224,0.35)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
     return c;
   }
 
@@ -40,7 +42,7 @@ export class LogoScene {
   // ---- projection of logo-space -> screen --------------------------------------------------------------
   frame(lt) {
     const push = 1 + 0.028 * ease.outQuad(prog(lt, 1.6, 6.0));
-    const k = 0.80 * push, cx = 960 + 4, cy = 546;
+    const V = this.V, k = (V ? 0.88 : 0.80) * push, cx = this.W / 2 + 4, cy = V ? 1020 : 546;
     return { k, X: (lx) => cx + (lx - CX0) * k, Y: (ly) => cy + (ly - CY0) * k, cx, cy };
   }
 
@@ -93,21 +95,21 @@ export class LogoScene {
     const kL = ease.outExpo(prog(lt, -0.06, 0.74));
     ctx.save();
     ctx.translate(-120 * (1 - kL), -90 * (1 - kL)); ctx.globalAlpha = clamp(kL * 2);
-    const ms = 1.3, mw = 342 * ms, mh = 258 * ms;
+    const V = this.V, ms = V ? 1.5 : 1.3, mw = 342 * ms, mh = 258 * ms;
     // dark sliver + green band along the panel's right diagonal (banner)
     const diag = [[mw, 0], [208 * ms, 226 * ms]];
     this.band(ctx, [mw + 4, 0], [208 * ms + 4, 226 * ms], 0, -80, 20, INK, null);
     this.band(ctx, [mw + 34, 0], [208 * ms + 30, 226 * ms], 0, 0, 30, GREEN, GREEN_HI, true);
     ctx.drawImage(B.banner_mountain, 0, 0, mw, mh);
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(mw, 0); ctx.lineTo(208 * ms, 226 * ms); ctx.lineTo(0, 258 * ms); ctx.stroke();
-    const hs = 1.3; ctx.drawImage(B.banner_hills, 0, 276 * hs, 206 * hs, 198 * hs);
+    const hs = V ? 1.3 : 1.3; ctx.drawImage(B.banner_hills, 0, V ? H - 198 * hs - 40 : 276 * hs, 206 * hs, 198 * hs);
     ctx.restore();
 
     // --- right: cloud panel
     const kR = ease.outExpo(prog(lt, 0.0, 0.85));
     ctx.save();
     ctx.translate(140 * (1 - kR), 80 * (1 - kR)); ctx.globalAlpha = clamp(kR * 2) * 0.9;
-    const cs = 1.1, cw = 358 * cs, ch = 408 * cs, cx0 = W - cw, cy0 = 190;
+    const cs = V ? 0.88 : 1.1, cw = 358 * cs, ch = 408 * cs, cx0 = W - cw, cy0 = V ? 250 : 190;
     ctx.drawImage(B.banner_cloud, cx0, cy0, cw, ch);
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(W, cy0); ctx.lineTo(cx0, cy0 + ch); ctx.lineTo(W, cy0 + ch * 0.76); ctx.stroke();
     ctx.restore();
@@ -115,6 +117,7 @@ export class LogoScene {
     // --- bottom-right: big green blade (banner), top-right: slim green slash
     const kB = ease.outExpo(prog(lt, 0.04, 0.9));
     ctx.save(); ctx.translate(200 * (1 - kB), 160 * (1 - kB)); ctx.globalAlpha = clamp(kB * 2);
+    if (V) ctx.translate(0, -40);
     const bl = [[W - 640, H + 10], [W - 20, H - 330], [W + 10, H - 220], [W, H], [W - 330, H]];
     const gB = ctx.createLinearGradient(W - 540, H, W + 60, H - 330); gB.addColorStop(0, '#16231d'); gB.addColorStop(0.42, '#2d6a22'); gB.addColorStop(1, GREEN_HI);
     ctx.fillStyle = gB; ctx.beginPath(); ctx.moveTo(W - 600, H + 10); ctx.lineTo(W + 76, H - 340); ctx.lineTo(W + 110, H - 330); ctx.lineTo(W + 110, H + 10); ctx.closePath(); ctx.fill();
@@ -123,7 +126,7 @@ export class LogoScene {
     const kT = ease.outExpo(prog(lt, 0.06, 0.85));
     ctx.save(); ctx.translate(-80 * (1 - kT), -160 * (1 - kT)); ctx.globalAlpha = clamp(kT * 2);
     const gT = ctx.createLinearGradient(W - 420, 0, W - 150, 230); gT.addColorStop(0, GREEN_HI); gT.addColorStop(1, '#2d6a22');
-    ctx.fillStyle = gT; ctx.beginPath(); ctx.moveTo(W - 340, 0); ctx.lineTo(W - 110, 0); ctx.lineTo(W - 330, 250); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = gT; ctx.beginPath(); ctx.moveTo(W - 340 + (V ? 120 : 0), 0); ctx.lineTo(W - 110 + (V ? 120 : 0), 0); ctx.lineTo(W - 330 + (V ? 120 : 0), V ? 190 : 250); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
@@ -228,7 +231,7 @@ export class LogoScene {
   tagline(ctx, lt, F) {
     const k = ease.outCubic(prog(lt, 2.35, 3.1));
     if (k <= 0) return;
-    const p = this.P.tagline, img = this.L.tagline, S = 1.32;
+    const p = this.P.tagline, img = this.L.tagline, S = this.V ? 1.08 : 1.32;
     const w = p.w * F.k * S, h = p.h * F.k * S, cx = F.X(p.x + p.w / 2), cy = F.Y(p.y + p.h / 2) + 14;
     ctx.save();
     ctx.globalAlpha *= clamp(k * 1.4);

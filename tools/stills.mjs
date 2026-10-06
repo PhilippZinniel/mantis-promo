@@ -2,14 +2,15 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { serve } from './serve.mjs';
-const [, , dir, ...ts] = process.argv;
+const argv = process.argv.slice(2), VERT = argv.includes('--vertical');
+const [dir, ...ts] = argv.filter((a) => a !== '--vertical');
 fs.mkdirSync(dir, { recursive: true });
 const { server, port } = await serve();
 const browser = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--force-color-profile=srgb'] });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+const page = await browser.newPage({ viewport: VERT ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 } });
 page.on('console', (m) => console.log('[page]', m.text()));
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`http://127.0.0.1:${port}/src/index.html`);
+await page.goto(`http://127.0.0.1:${port}/src/index.html${VERT ? '?v=1' : ''}`);
 await page.evaluate(() => window.filmReady);
 for (const t of ts) {
   const t0 = Date.now();

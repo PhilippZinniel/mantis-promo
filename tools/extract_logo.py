@@ -9,6 +9,8 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
 
+import os
+os.makedirs('build/logo/parts', exist_ok=True)
 SCALE = 2
 src = Image.open('assets/logo.png').convert('RGB')
 W, H = src.size
