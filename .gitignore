@@ -1,0 +1,10 @@
+# dependencies / environments (restored by tools/build_all.sh)
+node_modules/
+.venv/
+
+# generated intermediates (art layers, logo parts, banner panels, audio, frame chunks) — regenerable
+build/
+
+# OS / editor
+.DS_Store
+*.log

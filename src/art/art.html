@@ -1,0 +1,17 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:#222">
+<script type="module">
+import * as V from './landscape.js';
+window.bake = async (name, opts = {}) => {
+  const out = {};
+  if (name === 'vista') {
+    const L = V.drawVista(opts);
+    for (const k of ['sky', 'far', 'mid', 'near', 'leaves', 'mist', 'flat']) out[k] = L[k].toDataURL('image/png');
+    out.meta = { moon: L.moon, traveler: L.traveler, W: L.W, H: L.H, U: L.U };
+  }
+  if (name === 'panels') {
+    for (const [k, fn, o] of [['closeup', V.drawCloseup, { Wu: 590, Hu: 664 }], ['valley', V.drawValley, { Wu: 424, Hu: 664 }], ['burst', V.drawBurst, { Wu: 1000, Hu: 560 }]]) { const r = fn({ ...opts, ...o }); out[k] = r.flat.toDataURL('image/png'); }
+  }
+  return out;
+};
+window.ready = true;
+</script>
