@@ -5,6 +5,9 @@ node_modules/
 # generated intermediates (art layers, logo parts, banner panels, audio, frame chunks) — regenerable
 build/
 
+# rendered deliverables — published as GitHub Release assets, not tracked
+output/
+
 # OS / editor
 .DS_Store
 *.log
