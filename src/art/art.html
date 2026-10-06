@@ -1,6 +1,9 @@
 <!doctype html><meta charset=utf-8><body style="margin:0;background:#222">
+<link rel="stylesheet" href="/node_modules/@fontsource/barlow-condensed/600.css">
+<link rel="stylesheet" href="/node_modules/@fontsource/noto-sans-sc/chinese-simplified-700.css">
 <script type="module">
 import * as V from './landscape.js';
+import * as P from './pages.js';
 window.bake = async (name, opts = {}) => {
   const out = {};
   if (name === 'vista') {
@@ -10,6 +13,12 @@ window.bake = async (name, opts = {}) => {
   }
   if (name === 'panels') {
     for (const [k, fn, o] of [['closeup', V.drawCloseup, { Wu: 590, Hu: 664 }], ['valley', V.drawValley, { Wu: 424, Hu: 664 }], ['burst', V.drawBurst, { Wu: 1000, Hu: 560 }]]) { const r = fn({ ...opts, ...o }); out[k] = r.flat.toDataURL('image/png'); }
+  }
+  if (name === 'wall') {
+    await Promise.all([document.fonts.load('600 54px "Barlow Condensed"', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ.,?!\'-'), document.fonts.load('700 50px "Noto Sans SC"', P.ZH_ALL)]);
+    await document.fonts.ready;
+    const { atlas, meta } = P.bakeLibrary(opts);
+    out.zh = atlas.zh.toDataURL('image/png'); out.en = atlas.en.toDataURL('image/png'); out.meta = meta;
   }
   return out;
 };

@@ -117,8 +117,8 @@ export class World {
 
     // ---- wall of strips (finale) ----
     this.wall = new THREE.Group(); this.wall.visible = false; sc.add(this.wall);
-    this.wallStrips = [];
-    this.buildWall();
+    this.wallPages = [];
+    this.buildWall(this.A.wallMeta);
     this.noDepth();
   }
 
@@ -166,52 +166,77 @@ export class World {
     return this.type[name];
   }
 
-  buildWall() {
-    // 11 columns x 3 rows of strips cut from the page texture (random vertical window / flip), dim until the "translation wave" reaches them
-    const sw = PAGE.w * S, sh = PAGE.h * S;
-    const mat = (u) => new THREE.ShaderMaterial({
-      uniforms: { map: { value: this.pageTex }, off: { value: new THREE.Vector2(0, 0) }, sc: { value: new THREE.Vector2(1, 1) }, size: { value: new THREE.Vector2(sw, sh) },
-        invert: { value: u.invert }, wave: { value: 0 }, bright: { value: 1 }, fade: { value: 1 }, flash: { value: 0 } },
+  /**
+   * The finale: a library of pages. A scatter (not a grid) of the distinct synthetic pages baked in src/art/pages.js, in three
+   * depth layers (mid wall / far wall / a few soft foreground pages). Each page shows its source-language text until the
+   * translation wave scans through it, then turns to English.
+   */
+  buildWall(meta) {
+    const A = this.A, sw = PAGE.w * S, sh = PAGE.h * S;
+    const zhTex = tex(A.art.wall_zh, { aniso: this.aniso }), enTex = tex(A.art.wall_en, { aniso: this.aniso });
+    const mat = (slot, size, bias, dimK) => new THREE.ShaderMaterial({
+      uniforms: { zh: { value: zhTex }, en: { value: enTex }, slot: { value: new THREE.Vector4(...slot) }, size: { value: new THREE.Vector2(...size) },
+        wave: { value: 0 }, fade: { value: 1 }, dir: { value: 1 }, bias: { value: bias }, dimK: { value: dimK } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: `
-        uniform sampler2D map; uniform vec2 off; uniform vec2 sc; uniform vec2 size; uniform float invert; uniform float wave; uniform float bright; uniform float fade; uniform float flash;
+        uniform sampler2D zh; uniform sampler2D en; uniform vec4 slot; uniform vec2 size; uniform float wave; uniform float fade; uniform float dir; uniform float bias; uniform float dimK;
         varying vec2 vUv;
         void main(){
-          vec2 uv = vUv * sc + off;
-          vec3 c = texture2D(map, uv).rgb;
-          float l0 = dot(c, vec3(0.299, 0.587, 0.114));
-          vec3 col = mix(c, vec3(1.0 - l0) * vec3(0.95, 1.0, 0.94), invert);   // negatives stay monochrome (on palette)
-          float lum = dot(col, vec3(0.299, 0.587, 0.114));
-          vec3 dim = mix(vec3(lum), col, 0.25) * vec3(0.55, 0.68, 0.62) * 0.62;
-          // a green scan line reads the strip top -> bottom; above it the page is "lit"
+          vec2 uv = slot.xy + vUv * slot.zw;
+          float yy = dir > 0.0 ? vUv.y : 1.0 - vUv.y;
           float front = 1.0 - wave * 1.1;
-          float lit = smoothstep(front - 0.015, front + 0.015, vUv.y);
-          float band = exp(-abs(vUv.y - front) * 34.0) * step(0.002, wave) * (1.0 - step(0.998, wave));
+          float lit = smoothstep(front - 0.012, front + 0.012, yy) * step(0.0001, wave);
+          vec3 cz = texture2D(zh, uv, bias).rgb;
+          vec3 ce = texture2D(en, uv, bias).rgb;
+          vec3 col = mix(cz, ce, lit);
+          float lum = dot(col, vec3(0.299, 0.587, 0.114));
+          vec3 dim = mix(vec3(lum), col, 0.3) * vec3(0.56, 0.7, 0.63) * 0.66;
           col = mix(dim, col, lit);
+          float band = exp(-abs(yy - front) * 30.0) * step(0.0001, wave) * (1.0 - step(0.9999, wave));
           vec2 e = min(vUv, vec2(1.0) - vUv) * size;
-          float rim = smoothstep(0.55, 0.0, min(e.x, e.y));
-          col += vec3(0.30, 0.72, 0.12) * rim * (0.22 + 0.9 * lit);
-          col += vec3(0.42, 0.9, 0.2) * band * 0.85;
-          gl_FragColor = vec4(col * bright, fade);
+          float rim = smoothstep(0.5, 0.0, min(e.x, e.y));
+          col += vec3(0.30, 0.72, 0.12) * rim * (0.2 + 0.85 * lit);
+          col += vec3(0.42, 0.9, 0.2) * band * 0.8;
+          gl_FragColor = vec4(col * dimK, fade);
           #include <colorspace_fragment>
         }`,
       transparent: true, depthWrite: false, depthTest: false,
     });
     const R = rng(77);
-    const cols = 17, rows = 5, gapX = 1.8, gapY = 3.2;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (r === 2 && c === (cols - 1) / 2) continue;      // the hero page lives here
-        const cx = (c - (cols - 1) / 2) * (sw + gapX) + R.range(-0.6, 0.6), cy = wy(PAGE.h / 2) - (r - 2) * (sh + gapY) + (c % 2 ? 2.4 : -1.2) + R.range(-1.2, 1.2);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), mat({ invert: R() < 0.07 ? 1 : 0 }));
-        const flip = R() < 0.5, y0 = R.range(0, 0.4);
-        m.material.uniforms.sc.value.set(flip ? -1 : 1, R.range(0.55, 0.6));
-        m.material.uniforms.off.value.set(flip ? 1 : 0, y0);
-        m.position.set(cx, cy, -R.range(0.4, 15)); m.userData = { cx, cy, r, c, phase: R() };
-        m.renderOrder = -30 + Math.round(m.position.z * 2);
-        this.wall.add(m); this.wallStrips.push(m);
+    const hero = [0, wy(PAGE.h / 2)], deck = [];
+    const draw = () => { if (!deck.length) { const d = Array.from({ length: meta.pages.length }, (_, i) => i); for (let i = d.length - 1; i > 0; i--) { const j = R.int(0, i); [d[i], d[j]] = [d[j], d[i]]; } deck.push(...d); } return deck.pop(); };
+    const layers = [
+      { n: 40, z: [-1.4, -5.5], sc: [0.88, 1.16], xr: 72, yr: 50, gap: 1.4, dimK: 1.0, alpha: 1.0, bias: 0 },
+      { n: 70, z: [-9, -24], sc: [0.9, 1.45], xr: 120, yr: 78, gap: 1.0, dimK: 0.72, alpha: 1.0, bias: 0.6 },
+      { n: 3, z: [3.0, 6.5], sc: [1.0, 1.35], xr: 95, yr: 55, gap: 10.0, dimK: 0.55, alpha: 0.42, bias: 2.2 },
+    ];
+    layers.forEach((L, li) => {
+      const placed = li === 0 ? [{ x: hero[0], y: hero[1], w: sw * 1.0, h: sh * 1.0 }] : [];
+      let tries = 0;
+      while (placed.length - (li === 0 ? 1 : 0) < L.n && tries++ < 9000) {
+        const sc = R.range(...L.sc), crop = R() < 0.24 ? 0.62 : 1, w = sw * sc, h = sh * sc * crop;
+        const x = R.range(-L.xr, L.xr), y = hero[1] + R.range(-L.yr, L.yr);
+        if (li === 2 && Math.abs(x) < 34) continue;                                                  // foreground pages stay at the frame edges
+        if (placed.some((q) => Math.abs(x - q.x) < (w + q.w) / 2 + L.gap && Math.abs(y - q.y) < (h + q.h) / 2 + L.gap)) continue;
+        placed.push({ x, y, w, h, sc, crop });
       }
-    }
+      placed.slice(li === 0 ? 1 : 0).forEach((q) => {
+        const slot = draw(), col = slot % meta.cols, row = Math.floor(slot / meta.cols);
+        const tx = col * (meta.tw + meta.gutter), ty = row * (meta.th + meta.gutter);
+        const top = q.crop < 1 && R() < 0.5;                                                     // crop: top part or bottom part of the page
+        const u0 = tx / meta.W, uw = meta.tw / meta.W, vh = (meta.th / meta.H) * q.crop;
+        const v1 = 1 - ty / meta.H, v0 = top ? v1 - vh : 1 - (ty + meta.th) / meta.H;           // atlas v runs bottom-up
+        const size = [sw * q.sc, sh * q.sc * q.crop];
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(size[0], size[1]), mat([u0, top ? v0 : v0, uw, vh], size, L.bias, L.dimK * R.range(0.92, 1.05)));
+        m.material.uniforms.dir.value = R() < 0.7 ? 1 : -1;
+        const z = R.range(...L.z);
+        m.position.set(q.x, q.y, z);
+        m.rotation.set(R.range(-0.05, 0.05), R.range(-0.14, 0.14), R.range(-0.045, 0.045));
+        m.userData = { cx: q.x, cy: q.y, rz: m.rotation.z, dist: Math.hypot(q.x - hero[0], q.y - hero[1]) + (li === 2 ? 20 : 0), phase: R(), alpha: L.alpha, delay: R.range(0, 0.35), dur: R.range(0.7, 1.3), layer: li, slot };
+        m.renderOrder = -40 + Math.round(z * 2);
+        this.wall.add(m); this.wallPages.push(m);
+      });
+    });
   }
 
   setCamera({ u = PAGE.w / 2, v = 400, z = 0, d = 10.5, yaw = 0, pitch = 0, roll = 0, fov = 30, sx = 0, sy = 0 }) {

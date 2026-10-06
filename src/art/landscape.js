@@ -29,7 +29,7 @@ export function halftone(ctx, W, H, f, { pitch = 10, angle = Math.PI / 4, color 
   ctx.restore();
 }
 
-function speckle(ctx, W, H, n, { color = '0,0,0', a = [0.05, 0.2], r = [0.5, 1.6], seed = 5, clip } = {}) {
+export function speckle(ctx, W, H, n, { color = '0,0,0', a = [0.05, 0.2], r = [0.5, 1.6], seed = 5, clip } = {}) {
   const R = rng(seed);
   ctx.save(); if (clip) ctx.clip(clip);
   for (let i = 0; i < n; i++) {
@@ -40,7 +40,7 @@ function speckle(ctx, W, H, n, { color = '0,0,0', a = [0.05, 0.2], r = [0.5, 1.6
 }
 
 /** soft fog band */
-function fog(ctx, W, H, { y0, y1, color = [150, 185, 172], a = 0.5, seed = 3, blobs = 26, size = 0.28 }) {
+export function fog(ctx, W, H, { y0, y1, color = [150, 185, 172], a = 0.5, seed = 3, blobs = 26, size = 0.28 }) {
   const R = rng(seed);
   // gradient wash
   const g = ctx.createLinearGradient(0, y0, 0, y1);
@@ -61,7 +61,7 @@ function fog(ctx, W, H, { y0, y1, color = [150, 185, 172], a = 0.5, seed = 3, bl
  * Karst spire with ink-wash volume: jagged crown, ledged flanks, two-tone facets, brush strata, rim light.
  * (cx, baseY): centre of base; w: base half-width; h: height.
  */
-function pillar(ctx, N, R, cx, baseY, w, h, { tilt = 0, body = ['#0c1715', '#1d2f2a'], rim = '#8fb0a4', rimA = 0.6, hatch = 1, moss = 1, S = 1, spires = 3 }) {
+export function pillar(ctx, N, R, cx, baseY, w, h, { tilt = 0, body = ['#0c1715', '#1d2f2a'], rim = '#8fb0a4', rimA = 0.6, hatch = 1, moss = 1, S = 1, spires = 3 }) {
   const top = baseY - h, steps = 72;
   const seed = R() * 100;
   const L = [], Rr = [];
@@ -151,7 +151,7 @@ function pillar(ctx, N, R, cx, baseY, w, h, { tilt = 0, body = ['#0c1715', '#1d2
 }
 
 // ------------------------------------------------------------------ ridge (far layers)
-function ridge(ctx, W, H, N, { y, amp, scale, seed, color, fogColor = [140, 175, 162], fogA = 0.55, bottom = H, peaks = true, S = 1 }) {
+export function ridge(ctx, W, H, N, { y, amp, scale, seed, color, fogColor = [140, 175, 162], fogA = 0.55, bottom = H, peaks = true, S = 1 }) {
   const p = new Path2D();
   p.moveTo(0, bottom);
   for (let x = 0; x <= W; x += 6 * S) {
@@ -199,7 +199,7 @@ export function blade(ctx, x0, y0, ang, len, wid, { curve = 0.25, dark = '#143d1
 }
 
 // ------------------------------------------------------------------ traveler
-function traveler(ctx, x, y, s, { color = '#050908', rim = 'rgba(190,215,205,0.55)', wind = 1 } = {}) {
+export function traveler(ctx, x, y, s, { color = '#050908', rim = 'rgba(190,215,205,0.55)', wind = 1 } = {}) {
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
   ctx.fillStyle = color;
   // cloak + body (viewed from behind-left, facing right)
@@ -228,7 +228,7 @@ function traveler(ctx, x, y, s, { color = '#050908', rim = 'rgba(190,215,205,0.5
   ctx.restore();
 }
 
-function pine(ctx, R, x, y, h, color = '#030605') {
+export function pine(ctx, R, x, y, h, color = '#030605') {
   ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineCap = 'round';
   ctx.lineWidth = h * 0.035;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + h * 0.06 * (R() - 0.5) * 2, y - h * 0.5, x + h * 0.04, y - h); ctx.stroke();

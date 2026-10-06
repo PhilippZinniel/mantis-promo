@@ -1,1 +1,46 @@
-{ "fps": 60, "duration": 32, "bpm": 120, "events": [] }
+{
+  "_": "Shared timeline (seconds). Read by src/film.js, src/logoScene.js and tools/audio.py so picture and sound cannot drift. 120 BPM: one beat = 0.5 s; hits sit on the beat grid wherever the picture allows.",
+  "fps": 60,
+  "duration": 34.0,
+  "bpm": 120,
+  "t": {
+    "captionIn": 2.15,
+    "slash": 3.2,
+
+    "readCaption": 4.5,
+    "readQ": 5.0,
+    "descend": 5.8,
+    "readA": 6.5,
+    "pullback": 7.1,
+
+    "titleRead": 8.0,
+    "titleThe": 8.5,
+    "titleWhole": 9.0,
+    "titlePage": 9.5,
+    "titleEnd": 11.0,
+
+    "glossHave": 11.8,
+    "glossOwn": 12.15,
+    "glossExist": 12.5,
+    "strike": 13.0,
+
+    "morphQ": 13.15,
+    "morphCaption": 13.5,
+    "toAnswer": 16.9,
+    "andMore": 17.3,
+
+    "s5Pull": 18.4,
+    "words": 19.5,
+    "change": 19.7,
+    "wordsOut": 21.0,
+    "theArt": 21.5,
+    "stays": 21.7,
+    "textOut": 23.2,
+
+    "wallIn": 22.9,
+    "wave": 24.2,
+    "wipe": 27.6,
+    "paper": 28.0,
+    "lock": 30.0
+  }
+}

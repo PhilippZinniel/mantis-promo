@@ -7,7 +7,7 @@ export async function loadAssets() {
   const art = {};
   const names = {
     vista_sky: 'vista_sky', vista_far: 'vista_far', vista_mid: 'vista_mid', vista_near: 'vista_near', vista_leaves: 'vista_leaves', vista_mist: 'vista_mist',
-    vista: 'vista_flat', closeup: 'panels_closeup', valley: 'panels_valley', burst: 'panels_burst',
+    vista: 'vista_flat', closeup: 'panels_closeup', valley: 'panels_valley', burst: 'panels_burst', wall_zh: 'wall_zh', wall_en: 'wall_en',
   };
   await Promise.all(Object.entries(names).map(async ([k, f]) => { art[k] = await load(`/build/art/${f}.png`); }));
   const meta = await (await fetch('/build/logo/logo_meta.json')).json();
@@ -18,6 +18,7 @@ export async function loadAssets() {
   await Promise.all(['banner_mountain', 'banner_cloud', 'banner_hills'].map(async (k) => { brand[k] = await load(`/build/brand/${k}.png`); }));
   const vistaMeta = await (await fetch('/build/art/vista.json')).json();
   const cues = await (await fetch('/src/cues.json')).json();
+  const wallMeta = await (await fetch('/build/art/wall.json')).json();
   const trace = await (await fetch('/build/art/vista_trace.json')).json();
   // fonts: force the CJK slices actually used to download before any canvas text is drawn
   await Promise.all([
@@ -26,5 +27,5 @@ export async function loadAssets() {
     document.fonts.load('600 50px "Barlow Condensed"', 'ABC'), document.fonts.load('700 50px "Barlow Condensed"', 'ABC'), document.fonts.load('800 50px "Barlow Condensed"', 'ABC'),
   ]);
   await document.fonts.ready;
-  return { art, logo, brand, logoMeta: meta, vistaMeta, cues, trace };
+  return { art, logo, brand, logoMeta: meta, vistaMeta, cues, trace, wallMeta };
 }

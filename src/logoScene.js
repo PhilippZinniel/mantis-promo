@@ -3,7 +3,6 @@
 // through its baseline, and the leaf-slash of the "M" arrives last as the final strike.
 import { clamp, lerp, ease, prog, TAU, PAL, rng, smoothstep } from './lib/util.js';
 
-export const LOGO_T0 = 26.02;
 const INK = PAL.ink, GREEN = PAL.green, GREEN_HI = '#9BE33A';
 
 // logo-space landmarks (px in assets/logo.png)
@@ -12,7 +11,8 @@ const RING = { x: 627.5, y: 519.5, r: 293.5 };
 const HEAD_C = [745, 392];
 
 export class LogoScene {
-  constructor(assets, W = 1920, H = 1080) {
+  constructor(assets, W = 1920, H = 1080, t0 = 28.02) {
+    this.t0 = t0;                       // film time at which the logo build starts (lock-up = t0 + 1.98)
     this.A = assets; this.W = W; this.H = H; this.P = assets.logoMeta.parts; this.L = assets.logo; this.B = assets.brand;
     const mk = (w = W, h = H) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
     this.tmp = mk(); this.tctx = this.tmp.getContext('2d');
@@ -58,7 +58,7 @@ export class LogoScene {
 
   // ---- main ---------------------------------------------------------------------------------------------
   draw(ctx, t) {
-    const lt = t - LOGO_T0, { W, H } = this;
+    const lt = t - this.t0, { W, H } = this;
     const F = this.frame(lt);
     ctx.save();
     ctx.drawImage(this.paper, 0, 0, W, H);
@@ -93,21 +93,21 @@ export class LogoScene {
     const kL = ease.outExpo(prog(lt, -0.06, 0.74));
     ctx.save();
     ctx.translate(-120 * (1 - kL), -90 * (1 - kL)); ctx.globalAlpha = clamp(kL * 2);
-    const ms = 1.4, mw = 342 * ms, mh = 258 * ms;
+    const ms = 1.3, mw = 342 * ms, mh = 258 * ms;
     // dark sliver + green band along the panel's right diagonal (banner)
     const diag = [[mw, 0], [208 * ms, 226 * ms]];
     this.band(ctx, [mw + 4, 0], [208 * ms + 4, 226 * ms], 0, -80, 20, INK, null);
     this.band(ctx, [mw + 34, 0], [208 * ms + 30, 226 * ms], 0, 0, 30, GREEN, GREEN_HI, true);
     ctx.drawImage(B.banner_mountain, 0, 0, mw, mh);
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(mw, 0); ctx.lineTo(208 * ms, 226 * ms); ctx.lineTo(0, 258 * ms); ctx.stroke();
-    const hs = 1.4; ctx.drawImage(B.banner_hills, 0, 276 * hs, 206 * hs, 198 * hs);
+    const hs = 1.3; ctx.drawImage(B.banner_hills, 0, 276 * hs, 206 * hs, 198 * hs);
     ctx.restore();
 
     // --- right: cloud panel
     const kR = ease.outExpo(prog(lt, 0.0, 0.85));
     ctx.save();
-    ctx.translate(140 * (1 - kR), 80 * (1 - kR)); ctx.globalAlpha = clamp(kR * 2);
-    const cs = 1.28, cw = 358 * cs, ch = 408 * cs, cx0 = W - cw, cy0 = 150;
+    ctx.translate(140 * (1 - kR), 80 * (1 - kR)); ctx.globalAlpha = clamp(kR * 2) * 0.9;
+    const cs = 1.1, cw = 358 * cs, ch = 408 * cs, cx0 = W - cw, cy0 = 190;
     ctx.drawImage(B.banner_cloud, cx0, cy0, cw, ch);
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(W, cy0); ctx.lineTo(cx0, cy0 + ch); ctx.lineTo(W, cy0 + ch * 0.76); ctx.stroke();
     ctx.restore();
@@ -228,7 +228,7 @@ export class LogoScene {
   tagline(ctx, lt, F) {
     const k = ease.outCubic(prog(lt, 2.35, 3.1));
     if (k <= 0) return;
-    const p = this.P.tagline, img = this.L.tagline, S = 1.14;
+    const p = this.P.tagline, img = this.L.tagline, S = 1.32;
     const w = p.w * F.k * S, h = p.h * F.k * S, cx = F.X(p.x + p.w / 2), cy = F.Y(p.y + p.h / 2) + 14;
     ctx.save();
     ctx.globalAlpha *= clamp(k * 1.4);

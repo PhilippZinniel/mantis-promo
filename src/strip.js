@@ -232,7 +232,8 @@ export class Bubble {
         const fam = lang === 'en' ? EN : ZH;
         ctx.font = `${wgt || (lang === 'en' ? 600 : 700)} ${ln.size}px ${fam}`;
         if (lang === 'en' && 'letterSpacing' in ctx) ctx.letterSpacing = `${(d.track ?? 0) * (ln.size / 40)}px`;
-        const dy = ln.dy ?? ((i - (n - 1) / 2) * lh);
+        let dy = ln.dy ?? ((i - (n - 1) / 2) * lh);
+        if (i === 0 && ln.dy !== undefined && n > 1) dy *= this._sub;      // headline centres itself until its sub line arrives
         const ty = y + h / 2 + dy + ln.size * 0.34;
         ctx.save(); ctx.globalAlpha *= lineA; ctx.fillText(ln.t, x + w / 2, ty + (1 - lineA) * 10); ctx.restore();
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
@@ -241,24 +242,28 @@ export class Bubble {
     ctx.restore();
   }
 
+  /**
+   * The "isolated word" gloss: candidate English words scroll through the bubble like a slot reel (gray, unsure) until
+   * context arrives and the right one locks in.  g = { words: [{ t, c, size }], s: reel position (index, fractional), jx, jy }
+   */
   _drawGag(ctx, st) {
-    const g = st.gag; const d = this.def.en; const [x, y, w, h] = d.rect;
+    const g = st.gag, [x, y, w, h] = this.def.en.rect, cx = x + w / 2, cy = y + h / 2, STEP = 150;
     ctx.save(); ctx.textAlign = 'center';
-    ctx.fillStyle = g.color ?? '#7b8884';
-    const jx = g.dx ?? 0, jy = g.dy ?? 0;
-    ctx.font = `800 128px ${EN}`;
-    const ty = y + h / 2 - 30 + 128 * 0.34;
     if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
-    ctx.fillText(g.l1, x + w / 2 + jx, ty + jy);
-    const tw = ctx.measureText(g.l1).width;
-    ctx.font = `600 36px ${EN}`;
-    ctx.fillText(g.l2, x + w / 2 - jx * 0.6, y + h / 2 + 62 + 36 * 0.34 + jy);
+    g.words.forEach((wd, i) => {
+      const o = i - g.s;
+      if (Math.abs(o) > 0.95) return;
+      const a = 1 - smoothstep(0.2, 0.9, Math.abs(o));
+      if (a <= 0.01) return;
+      ctx.save();
+      ctx.globalAlpha *= a;
+      ctx.fillStyle = wd.c;
+      ctx.font = `800 ${wd.size}px ${EN}`;
+      const near = Math.abs(o) < 0.5;
+      ctx.fillText(wd.t, cx + (near ? (g.jx ?? 0) : 0), cy + o * STEP + wd.size * 0.34 + (near ? (g.jy ?? 0) : 0));
+      ctx.restore();
+    });
     if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-    if (g.strike > 0) {
-      ctx.strokeStyle = '#7CC326'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.shadowColor = 'rgba(124,195,38,0.9)'; ctx.shadowBlur = 18;
-      const a = [x + w / 2 - tw / 2 - 30, ty + 8], b = [x + w / 2 + tw / 2 + 30, ty - 90];
-      ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(lerp(a[0], b[0], g.strike), lerp(a[1], b[1], g.strike)); ctx.stroke();
-    }
     ctx.restore();
   }
 }

@@ -1,0 +1,6 @@
+# direct dependencies (pinned to the versions that produced the released renders)
+numpy==2.5.3
+scipy==1.18.1
+pillow==12.3.0
+scikit-image==0.26.0
+soundfile==0.14.0

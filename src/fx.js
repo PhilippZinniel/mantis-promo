@@ -161,7 +161,8 @@ let bloomBuf = null;
 export function bloom(ctx, W, H, { amt = 0.35, blur = 28, threshold = 0.0 } = {}) {
   if (!bloomBuf) { bloomBuf = document.createElement('canvas'); bloomBuf.width = W / 2; bloomBuf.height = H / 2; }
   const b = bloomBuf.getContext('2d');
-  b.globalCompositeOperation = 'copy'; b.filter = `blur(${blur / 2}px) brightness(1.15) saturate(1.2)`;
+  // thresholded: contrast around mid-grey drops the darks to black so only bright things glow (no milky black lift)
+  b.globalCompositeOperation = 'copy'; b.filter = `blur(${blur / 2}px) brightness(0.9) contrast(2.1) saturate(1.2)`;
   b.drawImage(ctx.canvas, 0, 0, W / 2, H / 2); b.filter = 'none';
   ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = amt; ctx.drawImage(bloomBuf, 0, 0, W, H); ctx.restore();
 }

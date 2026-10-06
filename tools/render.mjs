@@ -6,6 +6,7 @@ import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { serve } from './serve.mjs';
 
 const args = process.argv.slice(2);
@@ -43,6 +44,8 @@ if (args.includes('--poster')) {
 
 const from = +opt('from', 0), to = Math.min(+opt('to', TOTAL), TOTAL), W = +opt('workers', 4), crf = opt('crf', '14');
 const outFile = opt('out', 'build/video.mp4');
+const hashFile = opt('hash', null);          // --hash build/hashes.txt : sha1 of every rendered PNG frame (determinism check)
+const hashes = new Map();
 const chunkDir = 'build/chunks'; fs.rmSync(chunkDir, { recursive: true, force: true }); fs.mkdirSync(chunkDir, { recursive: true });
 const per = Math.ceil((to - from) / W);
 const t0 = Date.now(); let done = 0;
@@ -59,6 +62,7 @@ const worker = async (k) => {
   for (let f = a; f < b; f++) {
     const url = await grab(page, f / FPS);
     const buf = Buffer.from(url.split(',')[1], 'base64');
+    if (hashFile) hashes.set(f, crypto.createHash('sha1').update(buf).digest('hex'));
     if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
     done++;
     if (done % 30 === 0) { const el = (Date.now() - t0) / 1000; console.log(`frame ${done}/${to - from}  ${el.toFixed(0)}s  eta ${(el / done * (to - from - done)).toFixed(0)}s`); }
@@ -68,6 +72,7 @@ const worker = async (k) => {
 };
 const files = (await Promise.all(Array.from({ length: W }, (_, k) => worker(k)))).filter(Boolean);
 await browser.close(); server.close();
+if (hashFile) fs.writeFileSync(hashFile, [...hashes.entries()].sort((a, b) => a[0] - b[0]).map(([f, h]) => `${f} ${h}`).join('\n') + '\n');
 fs.writeFileSync(`${chunkDir}/list.txt`, files.map((f) => `file '${path.resolve(f)}'`).join('\n'));
 execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', `${chunkDir}/list.txt`, '-c', 'copy', outFile]);
 console.log('video', outFile, ((Date.now() - t0) / 1000).toFixed(0) + 's');
