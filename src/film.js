@@ -76,13 +76,13 @@ export class Film {
       mk('whole', 'WHOLE', (tw) => 6.9 + tw / 2, -8.6, '#7CC326');
       mk('page', 'PAGE.', (tw) => 6.9 + tw / 2, -12.2);
     } else {
-      // vertical: the page fills the frame, so the title is stacked above ("READ THE") and below ("WHOLE PAGE.") it
-      const sc = 0.47, top = 4.5, bot = -25.9, gap = -0.1, wd = { read: 14.26, the: 10.56, whole: 18.91, page: 15.02 };
-      const l1 = (wd.read + wd.the) * sc + gap, l2 = (wd.whole + wd.page) * sc + gap;
-      mk('read', 'READ', (tw) => -l1 / 2 + tw / 2, top, '#F7F8F7', sc);
-      mk('the', 'THE', (tw) => -l1 / 2 + wd.read * sc + gap + tw / 2, top, '#F7F8F7', sc);
-      mk('whole', 'WHOLE', (tw) => -l2 / 2 + tw / 2, bot, '#7CC326', sc);
-      mk('page', 'PAGE.', (tw) => -l2 / 2 + wd.whole * sc + gap + tw / 2, bot, '#F7F8F7', sc);
+      // vertical: "READ THE" above the page and "WHOLE PAGE." below it, sized to the frame width and kept inside the phone safe band
+      // (top 14 % / bottom 20 % are covered by platform UI). Geometry is derived from the measured glyph widths, not hard-coded.
+      const sc = 0.74, gap = 0.9, ink = (T) => T.w - 0.8 * sc;                   // plane width minus its 0.4-unit padding each side
+      const R = mk('read', 'READ', () => 0, 2.0, '#F7F8F7', sc), TH = mk('the', 'THE', () => 0, 2.0, '#F7F8F7', sc);
+      const WH = mk('whole', 'WHOLE', () => 0, -24.1, '#7CC326', sc), PG = mk('page', 'PAGE.', () => 0, -24.1, '#F7F8F7', sc);
+      const row = (a, b) => { const tot = ink(a) + ink(b) + gap; a.mesh.position.x = -tot / 2 + ink(a) / 2; b.mesh.position.x = tot / 2 - ink(b) / 2; };
+      row(R, TH); row(WH, PG);
     }
   }
 
@@ -192,7 +192,7 @@ export class Film {
     bloom(ctx, W, H, { amt: (window.__bloomK ?? 1) * lerp(0.2, 0.1, paper), blur: 30 });
     vignette(ctx, W, H, lerp(0.5, 0.0, paper), 0.62);
     grain(ctx, W, H, frame, lerp(0.04, 0.03, paper));
-    const fi = 1 - prog(t, 0, 0.5);
+    const fi = 0.6 * (1 - ease.outQuad(prog(t, 0, 0.45)));            // frame 0 already shows the moon (feeds use it as the poster)
     if (fi > 0) { ctx.fillStyle = `rgba(4,8,7,${fi})`; ctx.fillRect(0, 0, W, H); }
   }
 
@@ -200,34 +200,61 @@ export class Film {
   // S1 — the vista, layered in depth
   // =================================================================================================
   shotVista(ctx, t) {
-    const w = this.world, K = this.K, p = prog(t, 0, K.slash + 0.2);
-    const e = ease.inOutQuad(p);
-    const cam = this.V ? { u: lerp(800, 812, e), v: 396, d: lerp(12.5, 12.1, e), yaw: lerp(1.4, -0.8, e), pitch: lerp(-0.3, 0.4, p), roll: 0 }
-      : { u: 560, v: 322, d: lerp(10.2, 9.9, e), yaw: lerp(1.2, -1.0, e), pitch: lerp(-0.6, 0.8, p), roll: 0 };
+    const w = this.world, K = this.K, V = this.V, p = prog(t, 0, K.slash + 0.2);
+    const e = ease.inOutQuad(p), eo = ease.outCubic(prog(t, 0, 2.3));          // the early move is front-loaded: the frame is alive from frame 0
+    // 16:9 can only dolly (the 4:3 vista already fills the width); 9:16 also trucks sideways, so the caption *enters* the frame
+    const cam = V ? { u: lerp(712, 828, eo) + 5 * p, v: lerp(316, 304, e), d: lerp(13.1, 12.1, eo), yaw: lerp(3.6, -1.0, e), pitch: lerp(-0.4, 0.5, p), roll: 0 }
+      : { u: 560, v: lerp(334, 322, e), d: lerp(11.5, 9.9, eo), yaw: lerp(3.6, -1.0, e), pitch: lerp(-0.8, 0.8, p), roll: 0 };
     w.setCamera(cam);
-    w.setLayers(1, { d0: 10.5, c0: [0, -3.18] });
-    const reveal = [[0.2, 1.8], [0.7, 2.1], [0.9, 2.4], [1.2, 2.6], [1.0, 2.0]];
-    w.layers.forEach((m, i) => { m.material.opacity = ease.outQuad(prog(t, reveal[i][0], reveal[i][1])); });
+    w.setLayers(1.12, { d0: 10.5, c0: [0, -3.18] });
+    // layers arrive deliberately, far to near: each fades in while rising a little (nearest rises most)
+    const reveal = [[0.0, 1.0], [0.25, 1.3], [0.45, 1.6], [0.7, 1.9], [0.55, 1.7]];
+    const rise = [0, 0.1, 0.18, 0.3, 0.38];
+    w.layers.forEach((m, i) => {
+      const k = prog(t, reveal[i][0], reveal[i][1]);
+      m.material.opacity = i === 0 ? lerp(0.5, 1, ease.outQuad(k)) : ease.outQuad(k);
+      m.position.y -= rise[i] * (1 - ease.outCubic(k));
+    });
+    // the foreground blades sway in a wind that has not reached anything else
+    w.layers[4].rotation.z = 0.011 * Math.sin(t * 1.35 + 0.6) + 0.004 * Math.sin(t * 3.1);
     w.mists.forEach((m, i) => {
       m.visible = true;
-      m.position.set(Math.sin(t * 0.18 + m.userData.phase * 6) * 0.9 + (i - 1) * 0.4, -4.2 + m.userData.y + 0.7 * i - 0.2, m.userData.z + 0.001);
-      m.material.opacity = m.userData.op * ease.outQuad(prog(t, 0.8 + i * 0.3, 2.6));
+      m.position.set(Math.sin(t * 0.34 + m.userData.phase * 6) * 1.2 + (i - 1) * 0.4, -4.2 + m.userData.y + 0.7 * i - 0.2, m.userData.z + 0.001);
+      m.material.opacity = m.userData.op * ease.outQuad(prog(t, 0.1 + i * 0.2, 1.6));
     });
-    w.page.visible = false; w.pageShadow.visible = false; w.wall.visible = false; w.fog.forEach((f) => (f.visible = false));
+    w.page.visible = false; w.pageShadow.visible = false; w.wall.visible = false;
+    // drifting fog wisps (the same planes that haze the page later) -- ink moving in the dark
+    w.fog.forEach((f, i) => {
+      f.visible = true;
+      f.position.set(Math.sin(t * 0.16 + i * 2.1) * 5 + (i - 1.5) * 5 - t * 0.35, -3.6 - i * 0.55 + Math.cos(t * 0.1 + i) * 0.4, 1.0 + i * 1.5);
+      f.material.opacity = 0.055 * ease.outQuad(prog(t, 0.2, 1.4));
+    });
     Object.values(w.type).forEach((o) => (o.mesh.visible = false));
     w.liftBubbles(0);
-    // the caption box and its first glyph arrive together (no empty box)
+    // the caption box and its first glyph arrive together (no empty box), then the column writes itself
     const capIn = ease.outCubic(prog(t, K.captionIn, K.captionIn + 0.3));
-    this.bubbleStates({ caption: { p: 0, alpha: capIn, reveal: prog(t, K.captionIn + 0.12, K.slash - 0.1) }, q: { p: 0, alpha: 0 }, a: { p: 0, alpha: 0 } });
+    this.bubbleStates({ caption: { p: 0, alpha: capIn, reveal: prog(t, K.captionWrite, K.captionWriteEnd) }, q: { p: 0, alpha: 0 }, a: { p: 0, alpha: 0 } });
     w.render();
     ctx.filter = 'contrast(1.14) brightness(0.9) saturate(1.08)';
     ctx.drawImage(w.renderer.domElement, 0, 0);
     ctx.filter = 'none';
-    if (this.V) {                                    // 9:16: the 4:3 vista is taller than wide in frame -- the abyss swallows its lower edge
-      const g = ctx.createLinearGradient(0, this.H * 0.6, 0, this.H * 0.93);
-      g.addColorStop(0, 'rgba(4,9,8,0)'); g.addColorStop(0.55, 'rgba(4,9,8,0.7)'); g.addColorStop(1, 'rgba(4,9,8,1)');
-      ctx.fillStyle = g; ctx.fillRect(0, this.H * 0.6, this.W, this.H * 0.4);
-    }
+    this.openGlint(ctx, t);
+  }
+
+  /** a thin travelling green glint on the very line the strike will follow: the first hint of the blade, long before it falls */
+  openGlint(ctx, t) {
+    const { W, H, K } = this;
+    const k = prog(t, K.glint, K.glint + 0.9);
+    if (k <= 0 || k >= 1) return;
+    const ang = -1.05, cx = W * 0.58, cy = H * 0.5, ux = Math.cos(ang), uy = Math.sin(ang), L = 1500 * this.DS;
+    const s = lerp(-0.4, 0.42, ease.inOutCubic(k)) * L, len = 300 * this.DS;
+    const mx = cx + ux * s, my = cy + uy * s, a = Math.pow(Math.sin(Math.PI * k), 1.3) * 0.55;
+    const g = ctx.createLinearGradient(mx - ux * len / 2, my - uy * len / 2, mx + ux * len / 2, my + uy * len / 2);
+    g.addColorStop(0, 'rgba(160,240,80,0)'); g.addColorStop(0.5, `rgba(225,255,190,${a})`); g.addColorStop(1, 'rgba(160,240,80,0)');
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = g; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.shadowColor = `rgba(160,240,80,${a})`; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.moveTo(mx - ux * len / 2, my - uy * len / 2); ctx.lineTo(mx + ux * len / 2, my + uy * len / 2); ctx.stroke();
+    ctx.restore();
   }
 
   bubbleStates(map) {
@@ -326,9 +353,9 @@ export class Film {
       { t: K.andMore + 0.55, u: 846, v: 1008, d: 8.3, yaw: 3.5, pitch: -0.6, roll: 0.4, rest: true },
       { t: K.s5Pull, u: 846, v: 1008, d: 8.1, yaw: 3.5, pitch: -0.6, roll: 0.4, rest: true },
       // S5 — WORDS CHANGE. THE ART STAYS.: three-quarter view with the type on the left
-      { t: K.words, u: 560, v: 330, d: 22.5, yaw: -38, pitch: 9, roll: 1.5, sx: 0.19, rest: true },
-      { t: K.words + 1.4, u: 560, v: 340, d: 21.5, yaw: -27, pitch: 7, roll: 1, sx: 0.19 },
-      { t: K.words + 2.6, u: 560, v: 400, d: 22, yaw: -14, pitch: 3, roll: 0, sx: 0.15 },
+      { t: K.words, u: 560, v: 272, d: 22.5, yaw: -38, pitch: 9, roll: 1.5, sx: 0.19, rest: true },
+      { t: K.words + 1.4, u: 560, v: 280, d: 21.5, yaw: -27, pitch: 7, roll: 1, sx: 0.19 },
+      { t: K.words + 2.6, u: 560, v: 330, d: 22, yaw: -14, pitch: 3, roll: 0, sx: 0.15 },
       // S6 — back out into the library; the camera never settles until the wipe
       { t: K.wallIn, u: 552, v: 760, d: 24.5, yaw: -8, pitch: 5, roll: -2, sx: 0.1 },
       { t: K.wallIn + 2.1, u: 550, v: 1000, d: 72, yaw: -6, pitch: 7, roll: -3.5, sx: 0 },
@@ -348,9 +375,9 @@ export class Film {
       { t: 5.4, u: 510, v: 650, d: dW(930), yaw: -5, pitch: 2, roll: -1.4 },
       { t: 6.3, u: 770, v: 900, d: dW(780), yaw: 0.5, pitch: 0.4, roll: 0.2 },
       { t: K.pullback, u: 852, v: 1012, d: dW(560), yaw: 4, pitch: -0.8, roll: 0.5, rest: true },
-      { t: K.titleRead, u: 552, v: 1066, d: 64, yaw: -1, pitch: 0, roll: -4, rest: true },
-      { t: K.titlePage, u: 553, v: 1066, d: 66, yaw: -1.4, pitch: 0, roll: -4.6 },
-      { t: K.titleEnd, u: 553, v: 1060, d: 63, yaw: -1, pitch: 0, roll: -3.8 },
+      { t: K.titleRead, u: 552, v: 1200, d: 84, yaw: -0.6, pitch: 0, roll: -1.4, rest: true },
+      { t: K.titlePage, u: 553, v: 1200, d: 86, yaw: -0.9, pitch: 0, roll: -1.8 },
+      { t: K.titleEnd, u: 553, v: 1197, d: 83, yaw: -0.6, pitch: 0, roll: -1.2 },
       { t: K.glossHave + 0.1, u: 600, v: 780, d: dW(1060), yaw: -3, pitch: 1, roll: -1.2 },
       { t: K.strike, u: 590, v: 760, d: dW(1000), yaw: -2.4, pitch: 0.8, roll: -0.9 },
       { t: K.strike + 1.4, u: 520, v: 740, d: dW(1060), yaw: -3, pitch: 1.4, roll: -0.5 },
@@ -360,8 +387,9 @@ export class Film {
       { t: K.words, u: 560, v: 340, d: dW(1190), yaw: -24, pitch: 8, roll: 1.2, sy: 0.07, rest: true },
       { t: K.words + 1.4, u: 558, v: 350, d: dW(1160), yaw: -16, pitch: 6, roll: 0.8, sy: 0.07 },
       { t: K.words + 2.6, u: 556, v: 430, d: dW(1100), yaw: -8, pitch: 3, roll: 0, sy: 0.05 },
-      { t: K.wallIn, u: 552, v: 720, d: 44, yaw: -6, pitch: 4, roll: -1.5, sy: 0.05 },
-      { t: K.wallIn + 2.1, u: 552, v: 150, d: 78, yaw: -5, pitch: 6, roll: -3, sy: 0 },
+      { t: K.textOut - 0.1, u: 556, v: 430, d: dW(1100), yaw: -8, pitch: 3, roll: 0, sy: 0.05 },        // hold until the headline has gone
+      { t: K.wallIn + 0.55, u: 552, v: 720, d: 44, yaw: -6, pitch: 4, roll: -1.5, sy: 0.05 },
+      { t: K.wallIn + 2.3, u: 552, v: 150, d: 78, yaw: -5, pitch: 6, roll: -3, sy: 0 },
       { t: K.wipe - 0.6, u: 548, v: -700, d: 104, yaw: -4, pitch: 7, roll: -3.6 },
       { t: K.wipe + 0.6, u: 548, v: -1000, d: 108, yaw: -4, pitch: 7, roll: -3.8, rest: true },
     ];
@@ -424,8 +452,8 @@ export class Film {
     if (t < K.glossHave) aState = { p: 0, alpha: 1, hl: hl(K.readA + 0.05, K.readA + 0.6) };
     else if (t < K.strike) {
       const step = (t0, rate = 0.1) => ease.outCubic(prog(t, t0 - rate, t0));
-      const s = step(K.glossOwn) + step(K.glossExist) + step(K.strike, 0.14);     // ...and locks onto the right word as context arrives
-      const jit = (1 - prog(t, K.glossHave, K.glossHave + 0.1)) * ((Math.round(t * 60) % 2) ? 6 : -6);
+      const s = step(K.glossOwn) + step(K.glossExist) + step(K.strike, 0.1);      // ...and locks onto the right word as context arrives
+      const jit = (1 - prog(t, K.glossHave, K.glossHave + 0.07)) * ((Math.round(t * 60) % 2) ? 4 : -4);
       aState = { p: 1, alpha: 1, glow: 0, gag: { words: GLOSS, s, jx: jit, jy: -jit * 0.4 } };
     } else {
       aState = { p: flick ? 0 : 1, alpha: 1, sub: flick ? 1 : ease.outCubic(prog(t, K.andMore, K.andMore + 0.45)),
@@ -469,14 +497,15 @@ export class Film {
   s5Type(ctx, t) {
     const K = this.K;
     if (t < K.words - 0.1 || t > K.textOut + 0.4) return;
-    const V = this.V, x = V ? 70 : 96, y1 = V ? 300 : 410, y2 = V ? 470 : 560, SZ = V ? 150 : 136, ks = SZ / 136;
+    const ex = this.V ? 0.2 : 0;                         // 9:16: the page rises under the headline as the camera leaves; exit earlier
+    const V = this.V, x = V ? 70 : 96, y1 = V ? 392 : 410, y2 = V ? 562 : 560, SZ = V ? 150 : 136, ks = SZ / 136;     // 9:16: cap-height clears the top 14 % platform-UI band
     const g = '#7CC326';
     slicedText(ctx, 'WORDS', x, y1, { size: SZ, reveal: prog(t, K.words, K.words + 0.35), out: prog(t, K.wordsOut, K.wordsOut + 0.35) });
     slicedText(ctx, 'CHANGE.', x, y2, { size: SZ, reveal: prog(t, K.change, K.change + 0.4), out: prog(t, K.wordsOut + 0.05, K.wordsOut + 0.4) });
     if (t < K.theArt) brushStroke(ctx, x - 6, y2 + 28, x + 730 * ks, y2 + 20, { k: ease.outCubic(prog(t, K.change + 0.4, K.change + 0.9)), width: 24, seed: 4 });
-    slicedText(ctx, 'THE ART', x, y1, { size: SZ, reveal: prog(t, K.theArt, K.theArt + 0.35), out: prog(t, K.textOut - 0.05, K.textOut + 0.3) });
-    slicedText(ctx, 'STAYS.', x, y2, { size: SZ, reveal: prog(t, K.stays, K.stays + 0.4), out: prog(t, K.textOut, K.textOut + 0.35), color: g });
-    if (t >= K.stays + 0.1 && t < K.textOut + 0.4) brushStroke(ctx, x - 6, y2 + 28, x + 580 * ks, y2 + 22, { k: ease.outCubic(prog(t, K.stays + 0.4, K.stays + 0.9)), width: 22, seed: 9, color: '#F7F8F7' });
+    slicedText(ctx, 'THE ART', x, y1, { size: SZ, reveal: prog(t, K.theArt, K.theArt + 0.35), out: prog(t, K.textOut - 0.05 - ex, K.textOut + 0.3 - ex) });
+    slicedText(ctx, 'STAYS.', x, y2, { size: SZ, reveal: prog(t, K.stays, K.stays + 0.4), out: prog(t, K.textOut - ex, K.textOut + 0.35 - ex), color: g });
+    if (t >= K.stays + 0.1 && t < K.textOut + 0.35 - ex) brushStroke(ctx, x - 6, y2 + 28, x + 580 * ks, y2 + 22, { k: ease.outCubic(prog(t, K.stays + 0.4, K.stays + 0.9)), width: 22, seed: 9, color: '#F7F8F7' });
   }
 
   threads(ctx, t) {
@@ -531,6 +560,9 @@ export class Film {
       u.fade.value = ease.outQuad(prog(t, K.wallIn + ud.dist * 0.012, K.wallIn + 1.0 + ud.dist * 0.012)) * ud.alpha;
       const t0 = K.wave + ud.dist * 0.026 + ud.delay;
       u.wave.value = ease.inOutQuad(prog(t, t0, t0 + ud.dur));
+      // once the whole library is lit, brightness falls off with distance from the hero page: the eye always has an anchor
+      const fk = ease.inOutCubic(prog(t, K.wave + 1.2, K.wave + 3.0));
+      u.dimK.value = ud.dimBase * lerp(1, lerp(1, 0.5, smoothstep(9, 48, ud.dist)), fk);
       m.position.y = ud.cy + Math.sin(t * 0.55 + ud.phase * 6.28) * 0.28;
       m.rotation.z = ud.rz + Math.sin(t * 0.31 + ud.phase * 5) * 0.012;
     }

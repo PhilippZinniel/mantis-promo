@@ -193,6 +193,9 @@ export const PHRASES = [
   { zh: '出发吧！', en: "LET'S GO!", k: 'burst' }, { zh: '这不是梦。', en: 'THIS IS NO DREAM.' }, { zh: '终于到了。', en: 'WE MADE IT AT LAST.' },
   { zh: '听，风来了。', en: 'LISTEN. THE WIND IS COMING.' }, { zh: '快跑！', en: 'RUN!', k: 'burst' }, { zh: '这条路通向哪里？', en: 'WHERE DOES THIS ROAD LEAD?' },
   { zh: '故事才刚开始。', en: 'THE STORY HAS JUST BEGUN.' },
+  { zh: '谁在那里？', en: 'WHO GOES THERE?' }, { zh: '请等我。', en: 'PLEASE WAIT FOR ME.' }, { zh: '天亮了。', en: 'IT IS DAWN.' },
+  { zh: '我们赢了！', en: 'WE WON!', k: 'burst' }, { zh: '这是什么声音？', en: 'WHAT IS THAT SOUND?' }, { zh: '一切都变了。', en: 'EVERYTHING HAS CHANGED.' },
+  { zh: '再走一步。', en: 'ONE MORE STEP.' }, { zh: '我听见了。', en: 'I HEAR IT.' },
 ];
 export const ZH_ALL = [...new Set(PHRASES.map((p) => p.zh).join(''))].join('');
 
@@ -249,6 +252,9 @@ export const SPECS = [
   { layout: 'B', mood: 'night' }, { layout: 'C', mood: 'mixed' }, { layout: 'E', mood: 'ink' }, { layout: 'F', mood: 'night' },
   { layout: 'D', mood: 'green' }, { layout: 'G', mood: 'night' }, { layout: 'A', mood: 'ink' }, { layout: 'E', mood: 'mixed' },
   { layout: 'B', mood: 'green' }, { layout: 'C', mood: 'night' }, { layout: 'F', mood: 'ink' }, { layout: 'D', mood: 'mixed' },
+  // v1.2: ten more, so the library has ~5 uses per page instead of ~9
+  { layout: 'A', mood: 'green' }, { layout: 'G', mood: 'ink' }, { layout: 'F', mood: 'mixed' }, { layout: 'E', mood: 'night' }, { layout: 'B', mood: 'ink' },
+  { layout: 'D', mood: 'night' }, { layout: 'C', mood: 'green' }, { layout: 'G', mood: 'mixed' }, { layout: 'A', mood: 'night' }, { layout: 'F', mood: 'green' },
 ];
 
 function renderPageBase(spec, i, S) {
@@ -281,13 +287,14 @@ function renderPageBase(spec, i, S) {
     b.cx = clamp(bb[0] + bb[2] * R.range(0.28, 0.72), bb[0] + b.w / 2 + 18, bb[0] + bb[2] - b.w / 2 - 18);
     b.cy = clamp(bb[1] + bb[3] * R.range(0.14, 0.34), bb[1] + b.h / 2 + 18, bb[1] + bb[3] - b.h / 2 - 70);
     if (bb[2] < b.w + 40) continue;
+    if (bubbles.some((o) => Math.abs(o.cx - b.cx) < (o.w + b.w) / 2 + 30 && Math.abs(o.cy - b.cy) < (o.h + b.h) / 2 + 90)) continue;     // never let two bubbles collide
     bubbles.push(b);
   }
   return { c, bubbles, panels };
 }
 
 /** Bake the whole library into two atlases (zh / en). Returns canvases + metadata. */
-export function bakeLibrary({ S = 0.8, cols = 4, gutter = 8 } = {}) {
+export function bakeLibrary({ S = 0.7, cols = 5, gutter = 8 } = {}) {
   const TW = Math.round(PG.w * S), TH = Math.round(PG.h * S), rows = Math.ceil(SPECS.length / cols);
   const W = cols * (TW + gutter), H = rows * (TH + gutter);
   const atlas = { zh: mk(W, H), en: mk(W, H) };

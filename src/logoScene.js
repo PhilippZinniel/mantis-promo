@@ -92,7 +92,7 @@ export class LogoScene {
     ctx.restore();
 
     // --- left: mountain + hills panels with ink border lines, sliding in along their diagonal
-    const kL = ease.outExpo(prog(lt, -0.06, 0.74));
+    const kL = ease.outExpo(prog(lt, -0.4, 0.4));
     ctx.save();
     ctx.translate(-120 * (1 - kL), -90 * (1 - kL)); ctx.globalAlpha = clamp(kL * 2);
     const V = this.V, ms = V ? 1.5 : 1.3, mw = 342 * ms, mh = 258 * ms;
@@ -106,7 +106,7 @@ export class LogoScene {
     ctx.restore();
 
     // --- right: cloud panel
-    const kR = ease.outExpo(prog(lt, 0.0, 0.85));
+    const kR = ease.outExpo(prog(lt, -0.35, 0.45));
     ctx.save();
     ctx.translate(140 * (1 - kR), 80 * (1 - kR)); ctx.globalAlpha = clamp(kR * 2) * 0.9;
     const cs = V ? 0.88 : 1.1, cw = 358 * cs, ch = 408 * cs, cx0 = W - cw, cy0 = V ? 250 : 190;
@@ -115,7 +115,7 @@ export class LogoScene {
     ctx.restore();
 
     // --- bottom-right: big green blade (banner), top-right: slim green slash
-    const kB = ease.outExpo(prog(lt, 0.04, 0.9));
+    const kB = ease.outExpo(prog(lt, -0.3, 0.5));
     ctx.save(); ctx.translate(200 * (1 - kB), 160 * (1 - kB)); ctx.globalAlpha = clamp(kB * 2);
     if (V) ctx.translate(0, -40);
     const bl = [[W - 640, H + 10], [W - 20, H - 330], [W + 10, H - 220], [W, H], [W - 330, H]];
@@ -123,7 +123,7 @@ export class LogoScene {
     ctx.fillStyle = gB; ctx.beginPath(); ctx.moveTo(W - 600, H + 10); ctx.lineTo(W + 76, H - 340); ctx.lineTo(W + 110, H - 330); ctx.lineTo(W + 110, H + 10); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(W - 640, H + 14); ctx.lineTo(W + 60, H - 360); ctx.stroke();
     ctx.restore();
-    const kT = ease.outExpo(prog(lt, 0.06, 0.85));
+    const kT = ease.outExpo(prog(lt, -0.3, 0.45));
     ctx.save(); ctx.translate(-80 * (1 - kT), -160 * (1 - kT)); ctx.globalAlpha = clamp(kT * 2);
     const gT = ctx.createLinearGradient(W - 420, 0, W - 150, 230); gT.addColorStop(0, GREEN_HI); gT.addColorStop(1, '#2d6a22');
     ctx.fillStyle = gT; ctx.beginPath(); ctx.moveTo(W - 340 + (V ? 120 : 0), 0); ctx.lineTo(W - 110 + (V ? 120 : 0), 0); ctx.lineTo(W - 330 + (V ? 120 : 0), V ? 190 : 250); ctx.closePath(); ctx.fill();
@@ -253,9 +253,13 @@ export class LogoScene {
     for (const L of this.leaves) {
       const s = lt - (2.0 + L.ph * 1.5);
       if (s < 0) continue;
-      const a = clamp(Math.min(s / 0.6, 1)) * 0.9;
       const y = H * L.y0 - s * L.sp, x = W * L.x + Math.sin(s * 0.9 + L.ph * 6) * 26;
       if (y < -60) continue;
+      // keep-out: shards never cross the emblem, wordmark or tagline -- they fade out as they approach the lock-up's bounding box
+      const kx0 = F.X(70), kx1 = F.X(1180), ky0 = F.Y(40), ky1 = F.Y(1110);
+      const dd = Math.hypot(Math.max(kx0 - x, 0, x - kx1), Math.max(ky0 - y, 0, y - ky1));
+      const a = clamp(Math.min(s / 0.6, 1)) * 0.9 * smoothstep(0, 110, dd);
+      if (a <= 0.004) continue;
       ctx.save(); ctx.translate(x, y); ctx.rotate(L.rot + s * L.rs * 0.6); ctx.globalAlpha = a * (0.5 + 0.5 * Math.sin(L.ph * 9));
       const g = ctx.createLinearGradient(-L.s, 0, L.s, 0); g.addColorStop(0, '#2d6a22'); g.addColorStop(1, GREEN_HI);
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-L.s, 0); ctx.quadraticCurveTo(0, -L.s * 0.45, L.s, 0); ctx.quadraticCurveTo(0, L.s * 0.28, -L.s, 0); ctx.fill();

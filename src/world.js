@@ -70,15 +70,37 @@ export class World {
         pc.width = Math.round(src.width * OS); pc.height = Math.round(src.height * OS);
         const px = pc.getContext('2d');
         px.drawImage(src, (pc.width - src.width) / 2, (pc.height - src.height) / 2);
-        if (this.H > this.W && name === 'leaves') {                       // 9:16 sees the layer's bottom edge: let the blades melt into the mist there
+        if (false && this.H > this.W && name === 'leaves') {                       // 9:16 sees the layer's bottom edge: let the blades melt into the mist there
           const y0 = (pc.height + src.height) / 2, g = px.createLinearGradient(0, y0 - src.height * 0.13, 0, y0);
           g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
           px.globalCompositeOperation = 'destination-out'; px.fillStyle = g; px.fillRect(0, y0 - src.height * 0.13, pc.width, src.height * 0.13 + 4); px.globalCompositeOperation = 'source-over';
         }
         lt = tex(pc, { aniso: this.aniso });
       } else {
-        lt = tex(A.art['vista_' + name], { aniso: this.aniso });
-        lt.wrapS = lt.wrapT = THREE.ClampToEdgeWrapping; lt.repeat.set(OS, OS); lt.offset.set((1 - OS) / 2, (1 - OS) / 2);
+        // sky / far / mid: extend past the art with its own edge colours, blurred (a clamped edge row would streak into stripes
+        // wherever the frame exceeds the 4:3 vista -- the 9:16 frame and the early dolly both do)
+        const src = A.art['vista_' + name], PW = Math.round(src.width * OS), PH = Math.round(src.height * OS);
+        const ox = (PW - src.width) / 2, oy = (PH - src.height) / 2, W0 = src.width, H0 = src.height, e = 8;
+        const pc = document.createElement('canvas'); pc.width = PW; pc.height = PH;
+        const px = pc.getContext('2d');
+        px.filter = 'blur(36px)';
+        px.drawImage(src, 0, 0, W0, 3, ox, 0, W0, oy + e);                    // top
+        px.drawImage(src, 0, H0 - 3, W0, 3, ox, oy + H0 - e, W0, oy + e);     // bottom
+        px.drawImage(src, 0, 0, 3, H0, 0, oy, ox + e, H0);                    // left
+        px.drawImage(src, W0 - 3, 0, 3, H0, ox + W0 - e, oy, ox + e, H0);     // right
+        px.drawImage(src, 0, 0, 3, 3, 0, 0, ox + e, oy + e);                  // corners
+        px.drawImage(src, W0 - 3, 0, 3, 3, ox + W0 - e, 0, ox + e, oy + e);
+        px.drawImage(src, 0, H0 - 3, 3, 3, 0, oy + H0 - e, ox + e, oy + e);
+        px.drawImage(src, W0 - 3, H0 - 3, 3, 3, ox + W0 - e, oy + H0 - e, ox + e, oy + e);
+        px.filter = 'none';
+        if (name === 'sky') {                                   // feather the art's top into the extension (the halftone halo reaches the top edge)
+          const tc = document.createElement('canvas'); tc.width = W0; tc.height = H0;
+          const tx = tc.getContext('2d'); tx.drawImage(src, 0, 0); tx.globalCompositeOperation = 'destination-in';
+          const fg = tx.createLinearGradient(0, 0, 0, H0 * 0.14); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,1)');
+          tx.fillStyle = fg; tx.fillRect(0, 0, W0, H0);
+          px.drawImage(tc, ox, oy);
+        } else px.drawImage(src, ox, oy);
+        lt = tex(pc, { aniso: this.aniso });
       }
       const m = new THREE.Mesh(new THREE.PlaneGeometry(p1[2] * S * OS, p1[3] * S * OS), basic(lt, { transparent: i > 0, depthWrite: false }));
       m.renderOrder = 10 + i; m.userData.z = z; m.userData.base = new THREE.Vector3(wx(this.vistaCenter[0]), wy(this.vistaCenter[1]), 0);
@@ -269,7 +291,7 @@ export class World {
         const z = R.range(...L.z);
         m.position.set(q.x, q.y, z);
         m.rotation.set(R.range(-0.05, 0.05), R.range(-0.14, 0.14), R.range(-0.045, 0.045));
-        m.userData = { cx: q.x, cy: q.y, rz: m.rotation.z, dist: Math.hypot(q.x - hero[0], q.y - hero[1]) + (li === 2 ? 20 : 0), phase: R(), alpha: L.alpha, delay: R.range(0, 0.35), dur: R.range(0.7, 1.3), layer: li, slot };
+        m.userData = { dimBase: m.material.uniforms.dimK.value, cx: q.x, cy: q.y, rz: m.rotation.z, dist: Math.hypot(q.x - hero[0], q.y - hero[1]) + (li === 2 ? 20 : 0), phase: R(), alpha: L.alpha, delay: R.range(0, 0.35), dur: R.range(0.7, 1.3), layer: li, slot };
         m.renderOrder = -40 + Math.round(z * 2);
         this.wall.add(m); this.wallPages.push(m);
       });

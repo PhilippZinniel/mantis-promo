@@ -6,6 +6,7 @@ small physical-ish models (additive plucks and bells, pitch-swept toms, STFT-swe
 Run:  python tools/audio.py
 """
 import json
+import os
 import numpy as np
 import scipy.signal as sg
 import soundfile as sf
@@ -273,15 +274,43 @@ def knock(f, d=0.22):
     y = np.sin(2 * np.pi * f * t) * np.exp(-t / 0.07) + 0.4 * np.sin(2 * np.pi * f * 3.1 * t) * np.exp(-t / 0.03)
     return lp(y, 2500) * np.minimum(t / 0.002, 1)
 
+def lead(t0, notes, g=0.2, rev=0.55, pan=0.0, vib_hz=5.4):
+    """Bowed-string lead (erhu-ish): additive sawtooth through a formant low-pass, delayed vibrato that deepens as a note is held,
+    portamento into each note from the previous one, a little bow noise. notes: [(t_rel, 'F5', dur), ...]; placed at t0."""
+    if os.environ.get("NO_LEAD"):                                              # A/B switch used by the audio QA
+        return
+    total = max(s_ + d_ for s_, _, d_ in notes) + 0.5
+    out = np.zeros(n_(total)); prev = None
+    for s_, nm, d_ in notes:
+        f = hz(nm); dur = d_ + 0.12; n = n_(dur); t = np.arange(n) / SR
+        glide = np.ones(n)
+        if prev is not None and s_ - prev[0] < 0.15:                         # legato: slide up/down from the previous pitch over ~70 ms
+            gl = n_(0.07); glide[:gl] = (prev[1] / f) ** (1 - np.linspace(0, 1, gl) ** 1.5)
+        vib = 1 + (0.0045 + 0.004 * np.clip((t - 0.25) / 0.8, 0, 1)) * np.sin(2 * np.pi * vib_hz * t) * np.clip((t - 0.12) / 0.2, 0, 1)
+        inst_f = f * glide * vib
+        ph = 2 * np.pi * np.cumsum(inst_f) / SR
+        y = sum((1.0 / k ** 1.1) * np.sin(k * ph) for k in range(1, 15) if f * k < 7000)
+        y = lp(y, 2600, 2) + 0.05 * bp(RNG.standard_normal(n), 1800, 4200)      # formant-ish body + bow noise
+        env = np.minimum(t / 0.055, 1.0) * np.where(t < d_, 1.0, np.exp(-(t - d_) / 0.05))
+        y = y * env * (0.9 + 0.1 * np.sin(2 * np.pi * 0.7 * t))
+        i0 = n_(s_); out[i0:i0 + n] += y[: len(out) - i0]
+        prev = (s_ + d_, f)
+    out /= np.abs(out).max() + 1e-9
+    M.put('music', out, t0, g, pan=pan, rev=rev)
+
 # ================================================================================================ S1: unread (0 - slash)
 wind = lp(whoosh(DUR * 0 + K['slash'] + 0.2, 220, 800, 1.0, 'bell'), 1800)
-M.put('fx', fade(wind, 1.6), 0.0, 0.12, rev=0.3)                                          # night wind
+M.put('fx', fade(wind, 1.0), 0.0, 0.13, rev=0.3)                                          # night wind (up faster: the frame is alive from frame 0)
 _d = pad([hz('D2'), hz('A2'), hz('D3')], 5.2, 650, 0.08)
-M.put('pad', (fade(_d[0], 2.4), fade(_d[1], 2.4)), 0.1, 0.30)                              # drone
-M.put('music', bell(hz('A5'), 3.0, 0.5), 0.95, 0.07, pan=0.2, rev=0.7)                     # moon glint
-M.put('music', pluck(hz('D3'), 2.4, 0.4), 1.8, 0.2, rev=0.5)
-for i, nm in enumerate(['D4', 'F4', 'G4', 'A4', 'C5', 'A4', 'G4', 'F4']):                  # the caption is written: a first sketch of the motif
-    t = T('captionIn', 0.15 + i * 0.0937)
+M.put('pad', (fade(_d[0], 1.4), fade(_d[1], 1.4)), 0.0, 0.30)                              # drone
+M.put('music', bell(hz('D4'), 2.6, 0.5), 0.04, 0.09, pan=-0.1, rev=0.8)                    # first touch: the moon is lit
+# the glint: a soft, low-passed shimmer that travels with the light (kept dark on purpose -- no sharp highs this early)
+M.put('fx', lp(whoosh(0.9, 1400, 4800, 0.8, 'bell'), 6500), K['glint'], 0.07, pan=0.15, rev=0.5)
+M.put('music', bell(hz('A5'), 3.0, 0.5), K['glint'] + 0.3, 0.05, pan=0.2, rev=0.7)
+M.put('music', pluck(hz('D3'), 2.4, 0.4), 1.25, 0.2, rev=0.5)
+cw = (K['captionWriteEnd'] - K['captionWrite']) / 8.0
+for i, nm in enumerate(['D4', 'F4', 'G4', 'A4', 'C5', 'A4', 'G4', 'F4']):                  # the caption is written: a first sketch of the motif, on each glyph
+    t = K['captionWrite'] + i * cw
     M.put('music', pluck(hz(nm), 1.0, 0.35), t, 0.08, pan=0.2, rev=0.5)
     M.put('music', wood(1400 + 80 * i, 0.1), t, 0.07, pan=-0.2 + 0.05 * i)
 M.put('fx', riser(0.55, 400, 4200), T('slash', -0.6), 0.2, rev=0.2)
@@ -380,6 +409,15 @@ for i, t in enumerate(roll):
 M.put('fx', riser(1.9, 400, 7500), K['paper'] - 1.9, 0.4, rev=0.2)
 M.put('fx', whoosh(0.7, 700, 6500, 1.5, 'rise', 1.0), K['wipe'] - 0.1, 0.4, rev=0.15)            # blade wipe
 M.drop(K['paper'] - 0.17, K['paper'], 0.9, 0.025)                                          # silence on the beat before the paper opens
+
+# ================================================================================================ the melodic line (lead)
+# Phrase A -- "the art stays": calm, over the Bb chord (22.0-24.0)
+lead(K['stays'] + 0.3, [(0.0, 'F5', 1.0), (1.0, 'D5', 0.5), (1.5, 'C5', 0.5)], g=0.135, rev=0.65, pan=0.1)
+# Phrase B -- the library build: a rising C arpeggio, then the line leans into A major and the paper (24.0-28.0)
+lead(K['wave'] - 0.2, [(0.0, 'G4', 0.5), (0.5, 'C5', 0.5), (1.0, 'E5', 0.5), (1.5, 'G5', 0.5),
+                       (2.0, 'A5', 0.5), (2.5, 'G5', 0.25), (2.75, 'E5', 0.25), (3.0, 'C#5', 0.5), (3.5, 'E5', 0.5)], g=0.16, rev=0.55, pan=0.05)
+# Phrase C -- the paper opens on A, drops to F#, leans on the suspended G with the logo, and resolves to F# (the major third)
+lead(K['paper'], [(0.0, 'A5', 1.4), (1.5, 'F#5', 0.5), (2.0, 'G5', 0.5), (2.5, 'F#5', 2.4)], g=0.15, rev=0.7, pan=0.0, vib_hz=5.2)
 
 # ================================================================================================ S7: the logo
 LK = K['lock']; T0 = LK - 1.98

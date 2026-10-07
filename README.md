@@ -5,7 +5,7 @@
 `mantis_promo_poster.png` — poster frame (the locked logo at 31.6 s)
 `mantis_promo_contact_sheet.jpg` — one frame per second, used for QA
 
-> **v1.1** (see [What changed in v1.1](#what-changed-in-v11)) — a polish pass on [v1.0.0](../../releases/tag/v1.0.0), which is preserved unchanged.
+> **v1.2** (see [What changed in v1.2](#what-changed-in-v12)) — follow-up to v1.1, itself a polish pass on [v1.0.0](../../releases/tag/v1.0.0); every earlier release is preserved unchanged.
 
 The rendered files are **not tracked in git** — they are published as assets on the
 [GitHub Releases](../../releases) page (`output/` is gitignored and is where `./tools/build_all.sh` writes them locally).
@@ -23,7 +23,7 @@ rebuilding the text **without touching the art**. The film dramatises that as a 
 2. **Read** (3.2–19 s) — …and the slash splits the shot open onto the whole manhua page, floating in the dark. Green blade
    brackets *read* each region; brush-ribbon "context threads" tie the caption, the question, and the answer together.
    `READ THE WHOLE PAGE.` is typeset in space behind the strip. The film then makes its one joke: with only the isolated
-   source word to go on, the answer bubble's English reel cycles through unsure candidates (**`HAVE.` `OWN.` `EXIST.`**) —
+   source word to go on, the answer bubble's English reel cycles through three unsure candidates (**`HAVE.` `OWN.` `EXIST.`**, ~0.4 s each) —
    then context travels down the thread from the question and the reel locks onto **`YES.`** On the film's strike the Chinese
    text melts like wet ink into English, in place, in the same bubble shapes — and the page is held, whole, long enough to read.
 3. **Respect** (19–28 s) — **`WORDS CHANGE. THE ART STAYS.`** The text layer lifts off the art in depth, and a green
@@ -50,6 +50,25 @@ product demo:
 * All on-screen story text is original copy written for the film (a fictional "is there another world beyond these mountains?" exchange).
 * No fixtures, evaluation data, sealed/TEST material or repository content was used; the Mantis repo was only read, never modified.
 
+## What changed in v1.2
+
+A follow-up pass on the opening, the context reel and the closing minutes (the v1.1 notes follow below).
+
+* **Opening hook (both orientations, tuned separately).** The frame is alive from frame 0 (the moon is already lit; v1.1 began on black). The camera dollies in with an ease-out
+  that front-loads the motion; the landscape layers arrive far-to-near, each rising a little as it fades in (ridges ~0.5 s, pillars ~0.8 s, blades ~1 s); fog drifts, the foreground blades
+  sway, and the Chinese caption starts to write at 1.5 s (v1.1: 2.4 s) and takes ~1.3 s to finish, which leaves a still beat before the strike. At ~1 s a faint green glint travels
+  along the exact diagonal the 3.2 s blade will follow — the first, anticipatory hint of the strike. The 3.2 s cut is untouched, so the contrast between calm and strike is kept.
+  In 9:16 the camera also *trucks* sideways so the caption enters the frame, and the sky/far/mid layers are extended past their art edges (blurred edge colour) so the tall frame never exposes a seam.
+* **Context reel — micro-timing only.** Candidate dwell goes from ~0.27 s to ~0.40 s (the search is 1.35 s instead of 1.2 s), with the first-frame jitter reduced so the first word is legible. The device is unchanged.
+* **Restraint audit, 17–34 s.** Nothing was added.
+  * *S5:* the cropped-YES fragment no longer pokes into the bottom edge of the frame; in 9:16 the headline now clears the top 14 % platform-UI band and the camera holds until it has left (it used to collide with the rising page).
+  * *Library:* 22 distinct pages (v1.1: 12, ~9 uses each), and once the wave has lit everything, brightness falls off with distance from the hero page so the eye always has an anchor.
+  * *Logo:* banner decoration arrives earlier and has settled by the time the emblem builds; drifting leaf shards now fade out before they reach the emblem, wordmark or tagline. The tagline stays at its v1.1 size (a larger one was tried and rejected).
+  * *9:16 title:* "READ THE / WHOLE PAGE." is larger and sits inside the safe band instead of tucking under the tilted page edges.
+* **Score.** A bowed-string lead (an erhu-like voice: sawtooth + formant filter, delayed vibrato, legato slides) now carries three short phrases over the late film — calm in "the art stays", rising through the library build, and
+  leaning on the suspended G with the logo before resolving to F♯. The opening's wind and drone start faster and the caption glyphs are written to the picture's new timing.
+  Loudness is unchanged (≈ −18.1 LUFS, −1.7 dBFS peak).
+
 ## What changed in v1.1
 
 Findings from watching the v1.0 render at playback speed, and what was done (a smaller set of clear wins; some candidates were rejected — see the release notes):
@@ -71,7 +90,7 @@ Findings from watching the v1.0 render at playback speed, and what was done (a s
 | Layer | Implementation |
 |---|---|
 | Renderer | Deterministic, frame-addressed: `Film.renderAt(t)` is a pure function of time. Headless Chromium (Playwright) draws each frame; 5 workers each own a contiguous frame range and pipe PNG frames into their own ffmpeg H.264 encoder; the chunks are stream-copied into one file (the film is encoded exactly once, CRF 19). |
-| 3D | three.js (WebGL, Metal/ANGLE): the manhua strip is a textured plane in a perspective world with a physical camera path (yaw/pitch/roll/fov, off-axis shifts), a keyframed camera track, a lifting text layer, depth fog, and a library of 113 page planes (12 distinct synthetic pages, each reused with its own crop, scale, tilt, depth and scan timing, in three depth layers) with a custom "scan-line translation" shader. The camera is a monotone-cubic (PCHIP) track with log-space zoom, so it flows through its keys instead of stopping at each. Depth testing is disabled and ordering is explicit (avoids stacked-alpha tile artifacts on Apple GPUs). |
+| 3D | three.js (WebGL, Metal/ANGLE): the manhua strip is a textured plane in a perspective world with a physical camera path (yaw/pitch/roll/fov, off-axis shifts), a keyframed camera track, a lifting text layer, depth fog, and a library of 113 page planes (22 distinct synthetic pages, each reused ~5× with its own crop, scale, tilt, depth and scan timing, in three depth layers) with a custom "scan-line translation" shader. The camera is a monotone-cubic (PCHIP) track with log-space zoom, so it flows through its keys instead of stopping at each. Depth testing is disabled and ordering is explicit (avoids stacked-alpha tile artifacts on Apple GPUs). |
 | 2D | Canvas 2D for everything that must stay locked to the art but be resolution-independent: blade brackets, tapered brush threads, kinetic type with slanted-wipe reveals, brush strokes, silhouette trace, blade-wipe transition, the logo assembly. Overlays are projected from the 3D camera so they never slide off the art. |
 | Art | All panel art is procedural (`src/art/landscape.js`, `src/art/pages.js`): ink-wash karst pillars, halftone moon, fog, pines, traveler, brand-green leaf blades — baked in separate depth layers for parallax. `pages.js` composes the finale's library: 7 landscape kinds, 7 panel layouts and 4 moods, each baked in a Chinese and an English edition. |
 | Text | Original bilingual speech bubbles (`src/strip.js`) drawn in canvas; the Chinese→English transition is a blur+threshold "ink-melt" of both typesettings. |
