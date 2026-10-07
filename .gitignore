@@ -1,6 +1,8 @@
 # dependencies / environments (restored by tools/build_all.sh)
 node_modules/
 .venv/
+__pycache__/
+*.pyc
 
 # generated intermediates (art layers, logo parts, banner panels, audio, frame chunks) — regenerable
 build/
